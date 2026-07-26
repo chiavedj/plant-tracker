@@ -1,60 +1,60 @@
-# 🌿 Florae - Plant Care Tracker & Diagnosi IA
+# 🌿 Florae - Plant Care Tracker & AI Diagnosis
 
 ![Florae Screenshot](flore.png)
 
-Florae è un'applicazione web locale per il tracciamento e la cura delle tue piante, integrata con un sistema di diagnostica fotografica tramite Intelligenza Artificiale (OpenAI GPT-4o-mini).
+Florae is a local-first web application for tracking and caring for your plants, integrated with an AI-powered photo diagnosis system (OpenAI GPT-4o-mini).
 
-## ✨ Funzionalità principali
+## ✨ Key Features
 
-1. **Bacheca delle Attività**: Visualizzazione ad alta evidenza (in cima alla pagina) dei compiti urgenti da svolgere (es. piante malate o da innaffiare subito).
-2. **Tracciamento Stagionale**: Consigli di cura dinamici estratti in base al mese corrente per ciascuna pianta presente nel tuo database.
-3. **Database Botanico Personale**: Gestione e consultazione di schede dettagliate per ogni pianta (esposizione, irrigazione, cure generali e calendario stagionale).
-4. **Diagnosi IA con Foto**: Carica una foto delle foglie o dei fusti sofferenti. L'IA riconoscerà la pianta, identificherà la malattia/problema e proporrà una cura dettagliata. Cliccando su "Applica e Salva nel Database", l'attività verrà inserita automaticamente tra le priorità urgenti in bacheca!
-5. **Simulazione Intelligente**: Se non hai ancora una chiave OpenAI API, l'app simulerà diagnosi botaniche incredibilmente realistiche per farti testare il funzionamento. Puoi inserire la tua chiave reale direttamente dalla pagina delle impostazioni dell'app.
+1. **Activity Dashboard**: High-visibility panel (top of the page) showing urgent tasks — sick plants or those needing immediate watering.
+2. **Seasonal Care Tracking**: Dynamic care tips based on the current month for each plant in your database.
+3. **Personal Botanical Database**: Manage and browse detailed plant cards (light exposure, watering needs, general care, seasonal calendar).
+4. **AI Photo Diagnosis**: Upload a photo of struggling leaves or stems. The AI identifies the plant, diagnoses the disease/problem, and suggests a detailed treatment. Click "Apply & Save to Database" to automatically add the task to your urgent dashboard!
+5. **Smart Simulation Mode**: No OpenAI API key yet? The app simulates incredibly realistic botanical diagnoses so you can test the full workflow. Add your real key anytime from the Settings page.
 
 ---
 
-## 🚀 Come avviare l'applicazione in locale
+## 🚀 Getting Started (Local Setup)
 
-L'applicazione è scritta in Python con il framework Flask ed è pronta per essere avviata.
+Built with Python and Flask — ready to run locally.
 
-### 1. Prerequisiti
-Assicurati di avere Python installato sul tuo computer. Puoi verificarlo aprendo il Terminale e digitando:
+### 1. Prerequisites
+Ensure Python 3 is installed:
 ```bash
 python3 --version
 ```
 
-### 2. Configura l'ambiente e installa le dipendenze
-Apri il **Terminale** sul tuo Mac e spostati nella cartella del progetto:
+### 2. Set Up Environment & Install Dependencies
+Open **Terminal** and navigate to the project folder:
 ```bash
 cd ~/Desktop/plant-tracker
 ```
 
-Crea un ambiente virtuale (consigliato per non interferire con altri progetti):
+Create a virtual environment (recommended to avoid conflicts):
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 ```
 
-Installa le dipendenze richieste:
+Install required packages:
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Avvia l'applicazione
-Esegui lo script principale:
+### 3. Run the Application
 ```bash
 python3 app.py
 ```
 
-### 4. Apri il browser
-Una volta avviata, l'applicazione sarà disponibile al seguente indirizzo (la porta 5001 evita conflitti con AirPlay su macOS):
+### 4. Open in Browser
+The app runs on port **5001** (avoids AirPlay conflict on macOS):
 👉 **[http://127.0.0.1:5001](http://127.0.0.1:5001)**
 
 ---
 
-## 🛠️ Configurazione Chiave API OpenAI (Opzionale)
-Per sbloccare la vera intelligenza artificiale per l'analisi delle foto:
-1. Avvia l'app e vai alla pagina **Impostazioni** dal menu laterale.
-2. Incolla la tua chiave API di OpenAI (inizia con `sk-...`).
-3. Clicca su **Salva Configurazione**. Da questo momento, l'app utilizzerà il modello di visione `gpt-4o-mini` per diagnosticare le immagini reali che carichi!
+## 🛠️ OpenAI API Key Setup (Optional)
+
+To enable real AI-powered photo analysis:
+1. Launch the app and go to **Settings** from the sidebar.
+2. Paste your OpenAI API key (starts with `sk-...`).
+3. Click **Save Configuration**. The app will now use the `gpt-4o-mini` vision model for real image diagnosis!
