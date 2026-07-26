@@ -1,5 +1,7 @@
 # 🌿 Florae - Plant Care Tracker & Diagnosi IA
 
+![Florae Screenshot](flore.png)
+
 Florae è un'applicazione web locale per il tracciamento e la cura delle tue piante, integrata con un sistema di diagnostica fotografica tramite Intelligenza Artificiale (OpenAI GPT-4o-mini).
 
 ## ✨ Funzionalità principali
