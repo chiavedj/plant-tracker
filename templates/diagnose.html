@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-8">
+
+    <!-- Header -->
+    <div class="text-center space-y-2">
+        <div class="bg-emerald-100 text-emerald-800 w-16 h-16 rounded-3xl flex items-center justify-center mx-auto shadow-sm">
+            <i class="fa-solid fa-wand-magic-sparkles text-3xl animate-pulse"></i>
+        </div>
+        <h1 class="text-4xl font-extrabold text-stone-900 tracking-tight">Diagnostica con Intelligenza Artificiale</h1>
+        <p class="text-stone-600 max-w-lg mx-auto">Carica una foto ravvicinata delle foglie o dei fusti sofferenti. La nostra IA analizzerà i sintomi, identificherà il problema e ti darà soluzioni pratiche.</p>
+    </div>
+
+    <!-- Upload and Configuration Form -->
+    <form action="/diagnose" method="POST" enctype="multipart/form-data" class="bg-white rounded-3xl border border-stone-200/80 shadow-md p-6 md:p-8 space-y-6">
+        
+        <!-- Part 1: Select Plant Reference -->
+        <div class="space-y-3">
+            <h3 class="text-lg font-bold text-stone-900 flex items-center space-x-2">
+                <span class="bg-emerald-100 text-emerald-800 w-6 h-6 rounded-full text-xs flex items-center justify-center font-bold">1</span>
+                <span>Quale pianta stai analizzando?</span>
+            </h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1">Seleziona una pianta esistente</label>
+                    <select name="plant_id" id="plant-select" class="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                        <option value="new" {% if not request.args.get('plant_id') %} selected {% endif %}>-- Nuova Pianta (Non ancora salvata) --</option>
+                        {% for plant in plants %}
+                            <option value="{{ plant.id }}" {% if request.args.get('plant_id')|int == plant.id %} selected {% endif %}>{{ plant.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div id="custom-name-container">
+                    <label class="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1">O inserisci il nome della pianta</label>
+                    <input type="text" name="custom_plant_name" id="custom-name-input" placeholder="Es. Monstera, Calathea Ornata" 
+                           class="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                </div>
+            </div>
+        </div>
+
+        <!-- Part 2: Upload Photo -->
+        <div class="space-y-3">
+            <h3 class="text-lg font-bold text-stone-900 flex items-center space-x-2">
+                <span class="bg-emerald-100 text-emerald-800 w-6 h-6 rounded-full text-xs flex items-center justify-center font-bold">2</span>
+                <span>Carica la Foto</span>
+            </h3>
+
+            <!-- Drag and drop zone -->
+            <div class="relative border-2 border-dashed border-stone-300 rounded-3xl p-8 text-center bg-stone-50 hover:bg-stone-100/50 hover:border-emerald-500 transition-all group cursor-pointer" onclick="document.getElementById('file-input').click()">
+                <input type="file" name="plant_photo" id="file-input" accept="image/*" class="hidden" onchange="previewImage(this)">
+                
+                <div id="upload-placeholder" class="space-y-3">
+                    <div class="bg-white w-14 h-14 rounded-full flex items-center justify-center mx-auto shadow-sm text-stone-400 group-hover:text-emerald-600 transition-colors">
+                        <i class="fa-solid fa-cloud-arrow-up text-2xl"></i>
+                    </div>
+                    <div>
+                        <span class="block font-semibold text-stone-800 text-sm">Clicca per caricare un'immagine</span>
+                        <span class="text-xs text-stone-500">Supporta PNG, JPG o JPEG (max 16MB)</span>
+                    </div>
+                </div>
+
+                <div id="upload-preview-container" class="hidden space-y-3">
+                    <img id="upload-preview" src="" alt="Anteprima immagine" class="max-h-64 mx-auto rounded-2xl object-cover shadow-md border-4 border-white">
+                    <span class="block text-xs text-emerald-700 font-bold"><i class="fa-solid fa-circle-check"></i> Foto caricata correttamente. Clicca per cambiarla.</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit Button / Progress Indicator -->
+        <div class="pt-4 border-t border-stone-100">
+            <button type="submit" id="submit-btn" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center space-x-2">
+                <i class="fa-solid fa-microscope text-lg"></i>
+                <span>Avvia Diagnostica Avanzata</span>
+            </button>
+            
+            <div id="loading-indicator" class="hidden w-full bg-emerald-950 text-white p-5 rounded-xl space-y-3 text-center animate-pulse">
+                <i class="fa-solid fa-circle-notch fa-spin text-3xl text-emerald-400"></i>
+                <p class="font-serif text-lg font-bold">L'Intelligenza Artificiale sta analizzando la foto...</p>
+                <p class="text-xs text-emerald-300">Stiamo esaminando i sintomi fogliari, le sfumature di colore e la struttura cellulare della pianta. Potrebbe volerci qualche secondo.</p>
+            </div>
+        </div>
+
+    </form>
+</div>
+
+<script>
+    const plantSelect = document.getElementById('plant-select');
+    const customNameContainer = document.getElementById('custom-name-container');
+    const customNameInput = document.getElementById('custom-name-input');
+    const form = document.querySelector('form');
+    const submitBtn = document.getElementById('submit-btn');
+    const loadingIndicator = document.getElementById('loading-indicator');
+
+    // Toggle custom name input depending on plant selection
+    function checkSelectValue() {
+        if (plantSelect.value === 'new') {
+            customNameContainer.classList.remove('hidden');
+            customNameInput.required = true;
+        } else {
+            customNameContainer.classList.add('hidden');
+            customNameInput.required = false;
+        }
+    }
+
+    plantSelect.addEventListener('change', checkSelectValue);
+    window.addEventListener('load', checkSelectValue);
+
+    // Live Image Preview
+    function previewImage(input) {
+        const file = input.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('upload-preview').src = e.target.result;
+                document.getElementById('upload-placeholder').classList.add('hidden');
+                document.getElementById('upload-preview-container').classList.remove('hidden');
+            }
+            reader.readAsDataURL(file);
+        }
+    }
+
+    // Show loading state when form is submitted
+    form.addEventListener('submit', () => {
+        submitBtn.classList.add('hidden');
+        loadingIndicator.classList.remove('hidden');
+    });
+</script>
+{% endblock %}

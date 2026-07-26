@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="space-y-8 max-w-5xl mx-auto">
+
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-3xl font-extrabold text-stone-900 tracking-tight">Esito della Diagnostica IA</h1>
+            <p class="text-stone-500">L'analisi della foto è terminata. Di seguito trovi i risultati e i passaggi correttivi raccomandati.</p>
+        </div>
+        <a href="/diagnose" class="bg-stone-100 hover:bg-stone-200 text-stone-700 font-semibold px-4 py-2.5 rounded-xl text-sm transition-all flex items-center space-x-2">
+            <i class="fa-solid fa-arrow-left"></i>
+            <span>Nuova Diagnosi</span>
+        </a>
+    </div>
+
+    <!-- AI Mode Badge / Notice -->
+    {% if diagnosis.is_mock %}
+        <div class="bg-amber-50 border border-amber-200 text-amber-900 px-5 py-4 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+            <div class="flex items-start space-x-3">
+                <i class="fa-solid fa-circle-info text-2xl text-amber-600 mt-0.5 flex-shrink-0"></i>
+                <div>
+                    <h4 class="font-bold text-sm">Modalità Simulazione (Chiave API non inserita)</h4>
+                    <p class="text-xs text-stone-600 mt-0.5">La risposta mostrata sotto è simulata localmente in base al nome della pianta per scopi dimostrativi. Configura la tua chiave API di OpenAI per abilitare l'analisi reale.</p>
+                </div>
+            </div>
+            <a href="/settings" class="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4.5 py-2.5 rounded-xl shadow-sm transition-all text-center flex-shrink-0">
+                Imposta API Key
+            </a>
+        </div>
+    {% else %}
+        <div class="bg-emerald-50 border border-emerald-200 text-emerald-900 px-5 py-4 rounded-3xl flex items-center space-x-3 shadow-sm">
+            <i class="fa-solid fa-brain text-2xl text-emerald-600 flex-shrink-0"></i>
+            <div>
+                <h4 class="font-bold text-sm">Diagnosi Reale Integrata con {{ diagnosis.model_used }}!</h4>
+                <p class="text-xs text-stone-600">L'analisi fotografica è stata condotta in tempo reale valutando le caratteristiche biologiche riscontrate.</p>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Diagnosis Content Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- Left Column: Photo & Stats -->
+        <div class="lg:col-span-5 space-y-6">
+            <div class="bg-white rounded-3xl border border-stone-200/80 p-4 shadow-md space-y-4">
+                <h3 class="font-serif text-lg font-bold text-stone-950">Foto Analizzata</h3>
+                <div class="h-80 w-full rounded-2xl overflow-hidden bg-stone-100 border border-stone-200">
+                    <img src="{{ image_url }}" alt="Pianta Analizzata" class="w-full h-full object-cover">
+                </div>
+                
+                <div class="divide-y divide-stone-100 text-sm">
+                    <div class="py-2.5 flex justify-between items-center">
+                        <span class="text-stone-500 font-medium">Nome Identificato:</span>
+                        <strong class="text-stone-900 font-bold">{{ diagnosis.plant_name }}</strong>
+                    </div>
+                    <div class="py-2.5 flex justify-between items-center">
+                        <span class="text-stone-500 font-medium">Urgente Trattamento:</span>
+                        {% if diagnosis.urgency in ["Alta", "High", "Urgente"] %}
+                            <span class="bg-rose-100 text-rose-700 font-bold text-xs px-2.5 py-0.5 rounded-full uppercase tracking-wider animate-pulse border border-rose-200">ALTA</span>
+                        {% elif diagnosis.urgency in ["Media", "Medium"] %}
+                            <span class="bg-amber-100 text-amber-700 font-bold text-xs px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-amber-200">MEDIA</span>
+                        {% else %}
+                            <span class="bg-emerald-100 text-emerald-700 font-bold text-xs px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-emerald-200">BASSA</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Diagnostic Results -->
+        <div class="lg:col-span-7 space-y-6">
+            <div class="bg-white rounded-3xl border border-stone-200/80 p-6 md:p-8 shadow-md space-y-6">
+                <!-- Problem Statement -->
+                <div class="border-b border-stone-100 pb-5">
+                    <span class="text-xs font-bold text-emerald-800 tracking-wider uppercase bg-emerald-50 px-2.5 py-1 rounded-md">Patologia Riscontrata</span>
+                    <h2 class="font-serif text-3xl font-bold text-stone-900 mt-2.5">{{ diagnosis.problem }}</h2>
+                    <p class="text-stone-600 text-sm mt-2 leading-relaxed whitespace-pre-line">{{ diagnosis.details }}</p>
+                </div>
+
+                <!-- Treatment Plan / Solution -->
+                <div class="space-y-3">
+                    <h3 class="text-base font-bold text-stone-800 flex items-center space-x-2">
+                        <i class="fa-solid fa-kit-medical text-rose-500"></i>
+                        <span>Protocollo di Cura Consigliato</span>
+                    </h3>
+                    <div class="bg-stone-50 border border-stone-100 p-5 rounded-2xl">
+                        <p class="text-sm text-stone-700 leading-relaxed whitespace-pre-line font-medium">{{ diagnosis.solution }}</p>
+                    </div>
+                </div>
+
+                <!-- Guidelines for Exposure & Watering -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                    <div class="border border-stone-100 p-4 rounded-2xl bg-amber-50/20">
+                        <span class="text-xs font-bold text-amber-800 uppercase tracking-wider flex items-center space-x-1 mb-1">
+                            <i class="fa-solid fa-sun"></i>
+                            <span>Esposizione Ideale</span>
+                        </span>
+                        <p class="text-xs text-stone-700 leading-relaxed">{{ diagnosis.exposure_rules }}</p>
+                    </div>
+                    <div class="border border-stone-100 p-4 rounded-2xl bg-sky-50/20">
+                        <span class="text-xs font-bold text-sky-800 uppercase tracking-wider flex items-center space-x-1 mb-1">
+                            <i class="fa-solid fa-droplet"></i>
+                            <span>Rapporto d'Irrigazione</span>
+                        </span>
+                        <p class="text-xs text-stone-700 leading-relaxed">{{ diagnosis.watering_rules }}</p>
+                    </div>
+                </div>
+
+                <!-- Action Form to Commit to Database -->
+                <form action="/diagnose/apply" method="POST" class="pt-6 border-t border-stone-100">
+                    <!-- Hidden fields to transmit details -->
+                    <input type="hidden" name="plant_id" value="{{ plant_id }}">
+                    <input type="hidden" name="plant_name" value="{{ diagnosis.plant_name }}">
+                    <input type="hidden" name="species" value="{{ species }}">
+                    <input type="hidden" name="problem" value="{{ diagnosis.problem }}">
+                    <input type="hidden" name="details" value="{{ diagnosis.details }}">
+                    <input type="hidden" name="solution" value="{{ diagnosis.solution }}">
+                    <input type="hidden" name="urgency" value="{{ diagnosis.urgency }}">
+                    <input type="hidden" name="image_url" value="{{ image_url }}">
+                    <input type="hidden" name="exposure_rules" value="{{ diagnosis.exposure_rules }}">
+                    <input type="hidden" name="watering_rules" value="{{ diagnosis.watering_rules }}">
+
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <p class="text-xs text-stone-500 max-w-sm">Premendo "Applica e Salva", la pianta verrà aggiornata/salvata nel tracker e verrà creata automaticamente un'attività in bacheca con la cura consigliata.</p>
+                        
+                        <button type="submit" class="w-full sm:w-auto bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-6 py-4 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-circle-down"></i>
+                            <span>Applica e Salva nel Database</span>
+                        </button>
+                    </div>
+                </form>
+
+            </div>
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,350 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="space-y-8">
+
+    <!-- Header & Trigger to Add Plant -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-4xl font-extrabold text-stone-900 tracking-tight mb-2">Le mie Piante</h1>
+            <p class="text-stone-600">Gestisci la tua collezione botanica, monitora le condizioni ideali ed esplora i dettagli di ogni pianta.</p>
+        </div>
+        <button onclick="openAddModal()" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center space-x-2">
+            <i class="fa-solid fa-plus"></i>
+            <span>Aggiungi Nuova Pianta</span>
+        </button>
+    </div>
+
+    <!-- Plants Grid -->
+    {% if plants %}
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for plant in plants %}
+                <div class="bg-white rounded-3xl border border-stone-200/80 shadow-sm overflow-hidden hover:shadow-md transition-all duration-300 flex flex-col group">
+                    <!-- Plant Image or Placeholder -->
+                    <div class="relative h-56 bg-stone-100 overflow-hidden">
+                        {% if plant.image_url %}
+                            <img src="{{ plant.image_url }}" alt="{{ plant.name }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                        {% else %}
+                            <div class="w-full h-full bg-gradient-to-tr from-emerald-800/20 to-emerald-800/10 flex items-center justify-center">
+                                <i class="fa-solid fa-seedling text-6xl text-emerald-800/30"></i>
+                            </div>
+                        {% endif %}
+                        <div class="absolute top-4 right-4 flex space-x-1">
+                            <button onclick="openEditModal({{ plant.id }})" class="bg-white/90 backdrop-blur-sm hover:bg-white text-stone-700 p-2.5 rounded-full shadow-sm transition-all" title="Modifica">
+                                <i class="fa-solid fa-pen text-xs"></i>
+                            </button>
+                            <a href="/plant/delete/{{ plant.id }}" onclick="return confirm('Sei sicuro di voler eliminare questa pianta e tutte le sue attività?')" 
+                               class="bg-white/90 backdrop-blur-sm hover:bg-rose-50 hover:text-rose-600 text-stone-700 p-2.5 rounded-full shadow-sm transition-all" title="Elimina">
+                                <i class="fa-solid fa-trash-can text-xs"></i>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Card Body -->
+                    <div class="p-6 flex-grow flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <h3 class="font-serif text-2xl font-bold text-stone-900 leading-tight">{{ plant.name }}</h3>
+                            </div>
+                            <p class="text-sm text-stone-500 italic mb-4">{{ plant.species or 'Specie non specificata' }}</p>
+                            
+                            <!-- Quick attributes -->
+                            <div class="space-y-2.5 my-4">
+                                <div class="flex items-start space-x-2 text-stone-700 text-xs">
+                                    <div class="text-amber-500 w-5 flex-shrink-0 mt-0.5 text-center">
+                                        <i class="fa-solid fa-sun text-base"></i>
+                                    </div>
+                                    <div>
+                                        <strong class="block text-stone-500">Esposizione</strong>
+                                        <span>{{ plant.exposure or 'Non definita' }}</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-start space-x-2 text-stone-700 text-xs">
+                                    <div class="text-sky-500 w-5 flex-shrink-0 mt-0.5 text-center">
+                                        <i class="fa-solid fa-droplet text-base"></i>
+                                    </div>
+                                    <div>
+                                        <strong class="block text-stone-500">Irrigazione</strong>
+                                        <span>{{ plant.watering or 'Non definita' }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card Action Buttons -->
+                        <div class="pt-4 border-t border-stone-100 flex items-center justify-between gap-2 mt-4">
+                            <button onclick="openDetailModal({{ plant.id }})" class="bg-stone-100 hover:bg-stone-200/80 text-stone-700 font-semibold text-xs px-4 py-2.5 rounded-xl transition-all flex items-center space-x-1.5 flex-grow justify-center">
+                                <i class="fa-solid fa-circle-info"></i>
+                                <span>Scheda Pianta</span>
+                            </button>
+                            <a href="/diagnose?plant_id={{ plant.id }}" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs px-4 py-2.5 rounded-xl transition-all flex items-center space-x-1.5 flex-grow justify-center">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                                <span>Diagnostica</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="bg-white border border-stone-200/80 rounded-3xl p-12 text-center shadow-sm max-w-lg mx-auto">
+            <div class="bg-emerald-50 text-emerald-700 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fa-solid fa-leaf text-3xl"></i>
+            </div>
+            <h3 class="font-serif text-2xl font-bold text-stone-900 mb-2">Inizia la tua collezione!</h3>
+            <p class="text-sm text-stone-600 mb-6">Non hai ancora inserito nessuna pianta nel tuo database personale. Aggiungi la tua prima pianta o fai subito una diagnosi tramite foto.</p>
+            <div class="flex flex-col sm:flex-row justify-center items-center gap-3">
+                <button onclick="openAddModal()" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-6 py-3 rounded-xl shadow transition-all w-full sm:w-auto">
+                    Aggiungi Pianta
+                </button>
+                <a href="/diagnose" class="bg-stone-100 hover:bg-stone-200 text-stone-700 font-semibold px-6 py-3 rounded-xl transition-all w-full sm:w-auto">
+                    Diagnostica con Foto
+                </a>
+            </div>
+        </div>
+    {% endif %}
+
+</div>
+
+
+<!-- DETAILS MODAL -->
+<div id="detail-modal" class="hidden fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden border border-stone-100 flex flex-col md:flex-row max-h-[90vh] md:max-h-[85vh] animate-in fade-in zoom-in duration-200">
+        <!-- Image Area -->
+        <div class="w-full md:w-2/5 bg-stone-100 relative h-48 md:h-auto min-h-full">
+            <img id="detail-img" src="" alt="" class="w-full h-full object-cover">
+            <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent md:bg-gradient-to-r md:from-transparent md:to-white/10"></div>
+            <div class="absolute bottom-4 left-4 text-white md:hidden">
+                <h3 id="detail-mobile-name" class="font-serif text-2xl font-bold"></h3>
+            </div>
+        </div>
+        <!-- Content Area -->
+        <div class="w-full md:w-3/5 p-6 md:p-8 flex flex-col justify-between overflow-y-auto">
+            <div>
+                <div class="flex justify-between items-start">
+                    <div class="hidden md:block">
+                        <h3 id="detail-name" class="font-serif text-3xl font-bold text-stone-900"></h3>
+                        <p id="detail-species" class="text-sm text-stone-500 italic mb-4"></p>
+                    </div>
+                    <button onclick="document.getElementById('detail-modal').classList.add('hidden')" class="text-stone-400 hover:text-stone-700 p-1">
+                        <i class="fa-solid fa-xmark text-2xl"></i>
+                    </button>
+                </div>
+
+                <!-- Tabs or Accordions for info -->
+                <div class="space-y-4 mt-4 md:mt-0">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-amber-50/60 border border-amber-100 p-3.5 rounded-2xl">
+                            <span class="block text-[11px] font-bold text-amber-800 uppercase tracking-wider mb-1"><i class="fa-solid fa-sun mr-1"></i> Esposizione</span>
+                            <p id="detail-exposure" class="text-xs text-stone-700 font-medium"></p>
+                        </div>
+                        <div class="bg-sky-50/60 border border-sky-100 p-3.5 rounded-2xl">
+                            <span class="block text-[11px] font-bold text-sky-800 uppercase tracking-wider mb-1"><i class="fa-solid fa-droplet mr-1"></i> Irrigazione</span>
+                            <p id="detail-watering" class="text-xs text-stone-700 font-medium"></p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 class="text-sm font-bold text-stone-800 border-b pb-1 mb-1.5"><i class="fa-solid fa-seedling text-emerald-700 mr-1.5"></i>Istruzioni di Cura Generali</h4>
+                        <p id="detail-care" class="text-xs text-stone-600 leading-relaxed whitespace-pre-line"></p>
+                    </div>
+
+                    <!-- Seasonal care panel -->
+                    <div>
+                        <h4 class="text-sm font-bold text-stone-800 border-b pb-1 mb-2"><i class="fa-solid fa-calendar text-emerald-700 mr-1.5"></i>Calendario Stagionale</h4>
+                        <div class="grid grid-cols-2 gap-2 text-[11px]">
+                            <div class="bg-rose-50/30 p-2.5 rounded-xl border border-rose-100/50">
+                                <span class="font-bold text-pink-700 block mb-0.5">Primavera</span>
+                                <p id="detail-spring" class="text-stone-600"></p>
+                            </div>
+                            <div class="bg-yellow-50/30 p-2.5 rounded-xl border border-yellow-100/50">
+                                <span class="font-bold text-yellow-700 block mb-0.5">Estate</span>
+                                <p id="detail-summer" class="text-stone-600"></p>
+                            </div>
+                            <div class="bg-amber-50/30 p-2.5 rounded-xl border border-amber-100/50">
+                                <span class="font-bold text-amber-700 block mb-0.5">Autunno</span>
+                                <p id="detail-autumn" class="text-stone-600"></p>
+                            </div>
+                            <div class="bg-sky-50/30 p-2.5 rounded-xl border border-sky-100/50">
+                                <span class="font-bold text-sky-700 block mb-0.5">Inverno</span>
+                                <p id="detail-winter" class="text-stone-600"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-4 border-t border-stone-100 flex justify-end space-x-2 mt-6">
+                <button onclick="document.getElementById('detail-modal').classList.add('hidden')" class="bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold px-4 py-2 rounded-xl text-xs transition-all">Chiudi</button>
+                <a id="detail-diag-btn" href="" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-4 py-2 rounded-xl text-xs shadow transition-all flex items-center space-x-1">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span>Esegui Diagnosi Foto</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- ADD / EDIT PLANT MODAL (COMBINED) -->
+<div id="plant-modal" class="hidden fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden border border-stone-100 max-h-[90vh] flex flex-col animate-in fade-in zoom-in duration-200">
+        <!-- Header -->
+        <div class="bg-emerald-950 text-white p-6 flex justify-between items-center flex-shrink-0">
+            <h3 id="modal-title" class="text-xl font-bold font-serif">Aggiungi Pianta</h3>
+            <button onclick="document.getElementById('plant-modal').classList.add('hidden')" class="text-stone-300 hover:text-white">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
+        <!-- Form -->
+        <form id="plant-form" action="/plant/add" method="POST" enctype="multipart/form-data" class="p-6 space-y-4 overflow-y-auto flex-grow">
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1">Nome Comune Pianta *</label>
+                    <input type="text" name="name" id="form-name" required placeholder="Es. Monstera, Ficus, Sansevieria" 
+                           class="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1">Specie Botanica / Scientifica</label>
+                    <input type="text" name="species" id="form-species" placeholder="Es. Monstera Deliciosa, Ficus Lyrata" 
+                           class="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1">Esposizione Ideale</label>
+                    <input type="text" name="exposure" id="form-exposure" placeholder="Es: Luce diffusa indiretta, No sole diretto" 
+                           class="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1">Regole di Irrigazione</label>
+                    <input type="text" name="watering" id="form-watering" placeholder="Es: Quando asciuga il terriccio, 1 volta a settimana" 
+                           class="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1">Istruzioni Generali di Cura</label>
+                <textarea name="care" id="form-care" rows="3" placeholder="Pulisci le foglie, tieni lontano da fonti di calore, fertilizzante ogni 2 settimane..."
+                          class="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"></textarea>
+            </div>
+
+            <!-- Upload Photo -->
+            <div>
+                <label class="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1">Foto della Pianta</label>
+                <input type="file" name="image" id="form-image" accept="image/*" 
+                       class="w-full bg-stone-50 border border-stone-200 p-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100">
+            </div>
+
+            <!-- Seasonal care section -->
+            <div class="pt-3 border-t border-stone-100">
+                <h4 class="text-xs font-bold text-stone-500 uppercase tracking-wider mb-3">Guida alla Cura per Stagione (Consigli Predefiniti Compilati)</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[11px] font-bold text-pink-700 mb-1">🌸 Cura in Primavera</label>
+                        <textarea name="spring_care" id="form-spring" rows="2" class="w-full bg-stone-50 border border-stone-200 p-2 rounded-xl text-xs focus:ring-1 focus:ring-emerald-500">Ricomincia a concimare una volta al mese. Innaffia con più regolarità.</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-yellow-700 mb-1">☀️ Cura in Estate</label>
+                        <textarea name="summer_care" id="form-summer" rows="2" class="w-full bg-stone-50 border border-stone-200 p-2 rounded-xl text-xs focus:ring-1 focus:ring-emerald-500">Innaffia frequentemente, controllando che il terreno non si secchi del tutto. Proteggi dai raggi solari troppo intensi.</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-amber-700 mb-1">🍂 Cura in Autunno</label>
+                        <textarea name="autumn_care" id="form-autumn" rows="2" class="w-full bg-stone-50 border border-stone-200 p-2 rounded-xl text-xs focus:ring-1 focus:ring-emerald-500">Riduci gradualmente le annaffiature. Sospendi le concimazioni. Riporta in casa se la pianta soffre il freddo.</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-sky-700 mb-1">❄️ Cura in Inverno</label>
+                        <textarea name="winter_care" id="form-winter" rows="2" class="w-full bg-stone-50 border border-stone-200 p-2 rounded-xl text-xs focus:ring-1 focus:ring-emerald-500">Innaffia solo sporadicamente. Assicurati che la stanza sia luminosa e lontana dai termosifoni.</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="pt-4 border-t border-stone-100 flex justify-end space-x-3 flex-shrink-0">
+                <button type="button" onclick="document.getElementById('plant-modal').classList.add('hidden')" 
+                        class="px-4 py-2 text-stone-500 hover:text-stone-700 font-semibold text-sm">Annulla</button>
+                <button type="submit" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-6 py-2.5 rounded-xl text-sm shadow-md transition-all">
+                    Salva Pianta
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<script>
+    // Fetch and open Plant Details Modal via AJAX
+    function openDetailModal(plantId) {
+        fetch(`/plant/${plantId}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.image_url && !data.image_url.includes('placeholder')) {
+                    document.getElementById('detail-img').src = data.image_url;
+                } else {
+                    // Set beautiful plant svg as data URI
+                    document.getElementById('detail-img').src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='%23059669'><path d='M512 64c0-17.7-14.3-32-32-32H384c-35.3 0-64 28.7-64 64V224H256V160c0-17.7-14.3-32-32-32H128c-35.3 0-64 28.7-64 64V384H32c-17.7 0-32 14.3-32 32s14.3 32 32 32H480c17.7 0 32-14.3 32-32s-14.3-32-32-32H448V96c0-17.7-14.3-32-32-32H384c-17.7 0-32 14.3-32 32v64H288V96c0-17.7-14.3-32-32-32H160c-17.7 0-32 14.3-32 32v64H96c0 17.7 14.3 32 32 32h64v64H96v64h96v64h32V160h64v64h32v64h32V96h64v128h32V64z'/></svg>";
+                }
+                document.getElementById('detail-name').innerText = data.name;
+                document.getElementById('detail-mobile-name').innerText = data.name;
+                document.getElementById('detail-species').innerText = data.species || 'Specie sconosciuta';
+                document.getElementById('detail-exposure').innerText = data.exposure || 'Nessuna esposizione indicata';
+                document.getElementById('detail-watering').innerText = data.watering || 'Nessuna indicazione di irrigazione';
+                document.getElementById('detail-care').innerText = data.care || 'Nessun consiglio inserito.';
+                
+                document.getElementById('detail-spring').innerText = data.spring_care || 'Standard';
+                document.getElementById('detail-summer').innerText = data.summer_care || 'Standard';
+                document.getElementById('detail-autumn').innerText = data.autumn_care || 'Standard';
+                document.getElementById('detail-winter').innerText = data.winter_care || 'Standard';
+                
+                document.getElementById('detail-diag-btn').href = `/diagnose?plant_id=${data.id}`;
+                
+                document.getElementById('detail-modal').classList.remove('hidden');
+            });
+    }
+
+    // Modal configuration to ADD Plant
+    function openAddModal() {
+        document.getElementById('modal-title').innerText = "Aggiungi Pianta";
+        document.getElementById('plant-form').action = "/plant/add";
+        
+        // Reset form
+        document.getElementById('form-name').value = "";
+        document.getElementById('form-species').value = "";
+        document.getElementById('form-exposure').value = "";
+        document.getElementById('form-watering').value = "";
+        document.getElementById('form-care').value = "";
+        
+        document.getElementById('form-spring').value = "Ricomincia a concimare una volta al mese. Innaffia con più regolarità.";
+        document.getElementById('form-summer').value = "Innaffia frequentemente, controllando che il terreno non si secchi del tutto. Proteggi dai raggi solari troppo intensi.";
+        document.getElementById('form-autumn').value = "Riduci gradualmente le annaffiature. Sospendi le concimazioni. Riporta in casa se la pianta soffre il freddo.";
+        document.getElementById('form-winter').value = "Innaffia solo sporadicamente. Assicurati che la stanza sia luminosa e lontana dai termosifoni.";
+        
+        document.getElementById('plant-modal').classList.remove('hidden');
+    }
+
+    // Modal configuration to EDIT Plant via pre-fetching details
+    function openEditModal(plantId) {
+        document.getElementById('modal-title').innerText = "Modifica Pianta";
+        document.getElementById('plant-form').action = `/plant/edit/${plantId}`;
+        
+        fetch(`/plant/${plantId}`)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('form-name').value = data.name;
+                document.getElementById('form-species').value = data.species;
+                document.getElementById('form-exposure').value = data.exposure;
+                document.getElementById('form-watering').value = data.watering;
+                document.getElementById('form-care').value = data.care;
+                
+                document.getElementById('form-spring').value = data.spring_care;
+                document.getElementById('form-summer').value = data.summer_care;
+                document.getElementById('form-autumn').value = data.autumn_care;
+                document.getElementById('form-winter').value = data.winter_care;
+                
+                document.getElementById('plant-modal').classList.remove('hidden');
+            });
+    }
+</script>
+{% endblock %}

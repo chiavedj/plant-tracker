@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-8">
+
+    <!-- Header -->
+    <div>
+        <h1 class="text-4xl font-extrabold text-stone-900 tracking-tight mb-2">Impostazioni Applicazione</h1>
+        <p class="text-stone-600">Configura i parametri dell'applicazione, inclusa la chiave API per le funzionalità di intelligenza artificiale reale.</p>
+    </div>
+
+    <!-- API Key settings card -->
+    <div class="bg-white rounded-3xl border border-stone-200/80 shadow-md p-6 md:p-8 space-y-6">
+        <div class="border-b border-stone-100 pb-4">
+            <h2 class="font-serif text-2xl font-bold text-stone-900 flex items-center space-x-2">
+                <i class="fa-solid fa-key text-amber-500"></i>
+                <span>Configurazione Intelligenza Artificiale</span>
+            </h2>
+            <p class="text-xs text-stone-500 mt-1">Scegli il provider IA e inserisci la chiave API per analizzare foto reali delle piante.</p>
+        </div>
+
+        <form action="/settings" method="POST" class="space-y-6">
+            <!-- Provider Selection -->
+            <div>
+                <label class="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-2">Provider IA</label>
+                <div class="grid grid-cols-2 gap-4">
+                    <label class="relative flex items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition-all 
+                        {% if current_provider == 'openai' %} border-emerald-600 bg-emerald-50 text-emerald-900 {% else %} border-stone-200 hover:border-stone-300 text-stone-600 {% endif %}">
+                        <input type="radio" name="ai_provider" value="openai" class="hidden" {% if current_provider == 'openai' %} checked {% endif %}>
+                        <div class="flex flex-col items-center">
+                            <i class="fa-solid fa-robot text-xl mb-1"></i>
+                            <span class="font-bold text-sm">OpenAI</span>
+                        </div>
+                    </label>
+                    <label class="relative flex items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition-all 
+                        {% if current_provider == 'google' %} border-emerald-600 bg-emerald-50 text-emerald-900 {% else %} border-stone-200 hover:border-stone-300 text-stone-600 {% endif %}">
+                        <input type="radio" name="ai_provider" value="google" class="hidden" {% if current_provider == 'google' %} checked {% endif %}>
+                        <div class="flex flex-col items-center">
+                            <i class="fa-solid fa-cloud text-xl mb-1"></i>
+                            <span class="font-bold text-sm">Google Gemini/Gemma</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- OpenAI API Key -->
+            <div id="openai-section" class="{% if current_provider != 'openai' %} opacity-50 pointer-events-none {% endif %} transition-opacity">
+                <label class="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-2">OpenAI API Key</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-stone-400">
+                        <i class="fa-solid fa-lock"></i>
+                    </div>
+                    <input type="password" name="openai_api_key" id="openai-key-input" value="{{ openai_key }}" placeholder="sk-proj-..." 
+                           class="w-full bg-stone-50 border border-stone-200 pl-10 pr-12 py-3.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-mono">
+                    <button type="button" onclick="togglePasswordVisibility('openai-key-input')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-stone-400 hover:text-stone-600">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Google API Key -->
+            <div id="google-section" class="{% if current_provider != 'google' %} opacity-50 pointer-events-none {% endif %} transition-opacity">
+                <label class="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-2">Google AI API Key</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-stone-400">
+                        <i class="fa-solid fa-lock"></i>
+                    </div>
+                    <input type="password" name="google_api_key" id="google-key-input" value="{{ google_key }}" placeholder="AIzaSy..." 
+                           class="w-full bg-stone-50 border border-stone-200 pl-10 pr-12 py-3.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-mono">
+                    <button type="button" onclick="togglePasswordVisibility('google-key-input')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-stone-400 hover:text-stone-600">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+
+            <p class="text-[11px] text-stone-500 mt-1.5 leading-relaxed">Nota: Le chiavi vengono salvate nella sessione corrente del tuo browser o lette dalle variabili d'ambiente. Non vengono salvate in database pubblici.</p>
+
+            <!-- Configuration info alert -->
+            <div class="bg-emerald-50 border border-emerald-100 text-emerald-950 p-4.5 rounded-2xl flex items-start space-x-3 text-xs leading-relaxed">
+                <i class="fa-solid fa-circle-question text-emerald-600 text-lg mt-0.5 flex-shrink-0"></i>
+                <div>
+                    <h4 class="font-bold mb-0.5">Come ottenere le chiavi API?</h4>
+                    <div class="space-y-3 mt-1 text-stone-600 font-medium">
+                        <div>
+                            <span class="font-bold text-emerald-800">OpenAI:</span> 
+                            Vai su <a href="https://platform.openai.com/" target="_blank" class="underline">OpenAI Platform</a> &rarr; API Keys.
+                        </div>
+                        <div>
+                            <span class="font-bold text-emerald-800">Google:</span> 
+                            Vai su <a href="https://aistudio.google.com/" target="_blank" class="underline">Google AI Studio</a> &rarr; Get API Key.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-4 flex justify-end">
+                <button type="submit" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-6 py-3 rounded-xl shadow transition-all text-sm flex items-center space-x-1.5">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                    <span>Salva Configurazione</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Technical Info / Running Locally Card -->
+    <div class="bg-stone-100 rounded-3xl p-6 border border-stone-200/60 text-stone-600 space-y-3 text-xs">
+        <h4 class="font-bold text-stone-800 uppercase tracking-wider flex items-center space-x-1.5">
+            <i class="fa-solid fa-circle-info"></i>
+            <span>Dettagli Tecnici dell'Applicazione</span>
+        </h4>
+        <p>Questa applicazione è interamente programmata in Python utilizzando il framework leggero <strong>Flask</strong>. Il database locale in cui risiedono i dati delle tue piante e i compiti è memorizzato in un file SQLite chiamato <code>plants.db</code>, creato automaticamente nella cartella dell'applicazione.</p>
+        <p>Le immagini caricate vengono salvate in locale sotto la cartella <code>static/uploads/</code>.</p>
+    </div>
+
+</div>
+
+<script>
+    function togglePasswordVisibility(inputId) {
+        const input = document.getElementById(inputId);
+        const icon = input.nextElementSibling.querySelector('i');
+        if (input.type === "password") {
+            input.type = "text";
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        } else {
+            input.type = "password";
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        }
+    }
+
+    function updateProviderUI() {
+        const selectedProvider = document.querySelector('input[name="ai_provider"]:checked')?.value;
+        const openaiSection = document.getElementById('openai-section');
+        const googleSection = document.getElementById('google-section');
+        const labels = document.querySelectorAll('.grid.grid-cols-2.gap-4 > label');
+        if (labels.length >= 2) {
+            const openaiLabel = labels[0];
+            const googleLabel = labels[1];
+            if (selectedProvider === 'openai') {
+                openaiSection.classList.remove('opacity-50', 'pointer-events-none');
+                googleSection.classList.add('opacity-50', 'pointer-events-none');
+                openaiLabel.classList.remove('border-stone-200', 'hover:border-stone-300', 'text-stone-600');
+                openaiLabel.classList.add('border-emerald-600', 'bg-emerald-50', 'text-emerald-900');
+                googleLabel.classList.remove('border-emerald-600', 'bg-emerald-50', 'text-emerald-900');
+                googleLabel.classList.add('border-stone-200', 'hover:border-stone-300', 'text-stone-600');
+            } else {
+                googleSection.classList.remove('opacity-50', 'pointer-events-none');
+                openaiSection.classList.add('opacity-50', 'pointer-events-none');
+                googleLabel.classList.remove('border-stone-200', 'hover:border-stone-300', 'text-stone-600');
+                googleLabel.classList.add('border-emerald-600', 'bg-emerald-50', 'text-emerald-900');
+                openaiLabel.classList.remove('border-emerald-600', 'bg-emerald-50', 'text-emerald-900');
+                openaiLabel.classList.add('border-stone-200', 'hover:border-stone-300', 'text-stone-600');
+            }
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', updateProviderUI);
+    document.querySelectorAll('input[name="ai_provider"]').forEach(radio => {
+        radio.addEventListener('change', updateProviderUI);
+    });
+</script>
+{% endblock %}

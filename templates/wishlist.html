@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="font-serif text-4xl font-bold text-emerald-900">La mia Wishlist</h1>
+            <p class="text-stone-500 mt-2">Le piante che desidero aggiungere alla mia collezione.</p>
+        </div>
+        <button onclick="document.getElementById('add-modal').classList.remove('hidden')" class="bg-emerald-700 hover:bg-emerald-800 text-white px-6 py-3 rounded-xl font-semibold transition-all flex items-center space-x-2 shadow-lg">
+            <i class="fa-solid fa-plus"></i>
+            <span>Aggiungi Pianta</span>
+        </button>
+    </div>
+
+    {% if suggestions %}
+    <div class="mb-12">
+        <div class="flex items-center space-x-3 mb-6">
+            <div class="bg-amber-100 p-2 rounded-lg text-amber-600">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+            </div>
+            <h2 class="font-serif text-2xl font-bold text-emerald-800">Consigli per te (Stagionali)</h2>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {% for sug in suggestions %}
+            <div class="bg-white p-4 rounded-2xl border-2 border-dashed border-amber-200 shadow-sm hover:border-amber-400 transition-all group relative">
+                <h3 class="font-bold text-emerald-800 mb-1">{{ sug.name }}</h3>
+                <p class="text-xs text-stone-600 leading-relaxed mb-3">{{ sug.reason }}</p>
+                <form action="{{ url_for('add_wishlist_item') }}" method="POST" class="inline">
+                    <input type="hidden" name="name" value="{{ sug.name }}">
+                    <button type="submit" class="text-xs bg-amber-100 hover:bg-amber-200 text-amber-700 px-3 py-1.5 rounded-lg font-semibold transition-colors flex items-center space-x-1">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Aggiungi</span>
+                    </button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {% for item in wishlist %}
+        <div class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm hover:shadow-md transition-all group">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h3 class="font-serif text-xl font-bold text-emerald-800 group-hover:text-emerald-600 transition-colors">{{ item.name }}</h3>
+                    <p class="text-sm text-stone-500 italic">{{ item.species }}</p>
+                </div>
+                <div class="flex space-x-2">
+                    <form action="{{ url_for('move_to_plants', id=item.id) }}" method="POST" class="inline">
+                        <button type="submit" class="text-emerald-600 hover:bg-emerald-50 p-2 rounded-lg transition-colors" title="Aggiungi alle mie piante">
+                            <i class="fa-solid fa-circle-plus text-xl"></i>
+                        </button>
+                    </form>
+                    <form action="{{ url_for('delete_wishlist_item', id=item.id) }}" method="POST" class="inline">
+                        <button type="submit" class="text-rose-400 hover:bg-rose-50 p-2 rounded-lg transition-colors" title="Rimuovi dalla wishlist">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="mt-4 p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+                <div class="flex items-center space-x-2 text-emerald-700 font-semibold text-sm mb-2">
+                    <i class="fa-solid fa-calendar-check"></i>
+                    <span>Periodo migliore per l'acquisto:</span>
+                </div>
+                <p class="text-stone-700 text-sm leading-relaxed">
+                    {{ item.best_time or "Consiglio in arrivo..." }}
+                </p>
+            </div>
+            
+            {% if item.notes %}
+            <div class="mt-4 text-sm text-stone-600 italic">
+                <i class="fa-solid fa-note-sticky mr-2 text-stone-400"></i>
+                {{ item.notes }}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if not wishlist %}
+    <div class="text-center py-20">
+        <div class="bg-stone-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="fa-solid fa-heart-crack text-stone-300 text-3xl"></i>
+        </div>
+        <h3 class="text-xl font-serif font-semibold text-stone-600">La tua wishlist è vuota</h3>
+        <p class="text-stone-400 mt-2">Inizia ad aggiungere le piante dei tuoi sogni!</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal Aggiunta -->
+<div id="add-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl transition-all scale-95">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="font-serif text-2xl font-bold text-emerald-900">Nuova Pianta</h2>
+            <button onclick="document.getElementById('add-modal').classList.add('hidden')" class="text-stone-400 hover:text-stone-600">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
+        
+        <form action="{{ url_for('add_wishlist_item') }}" method="POST" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-stone-700 mb-1">Nome Pianta</label>
+                <input type="text" name="name" required class="w-full px-4 py-2 rounded-xl border border-stone-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all" placeholder="es. Monstera Adansonii">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-stone-700 mb-1">Specie (opzionale)</label>
+                <input type="text" name="species" class="w-full px-4 py-2 rounded-xl border border-stone-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all" placeholder="es. Araceae">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-stone-700 mb-1">Note personali</label>
+                <textarea name="notes" class="w-full px-4 py-2 rounded-xl border border-stone-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all" rows="3" placeholder="Dove l'hai vista? Qualità particolare?"></textarea>
+            </div>
+            <div class="pt-4">
+                <button type="submit" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3 rounded-xl transition-all shadow-lg">
+                    Aggiungi alla Wishlist
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

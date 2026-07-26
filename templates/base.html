@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Florae - Plant Tracker & Diagnosi IA</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for beautiful icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        h1, h2, h3, .font-serif {
+            font-family: 'Playfair Display', serif;
+        }
+    </style>
+</head>
+<body class="bg-stone-50 text-stone-800 min-h-screen flex flex-col md:flex-row">
+
+    <!-- Mobile Nav Header -->
+    <header class="md:hidden bg-emerald-900 text-white p-4 flex justify-between items-center shadow-md sticky top-0 z-30">
+        <div class="flex items-center space-x-2">
+            <i class="fa-solid fa-leaf text-emerald-400 text-2xl"></i>
+            <span class="font-serif text-2xl font-bold tracking-wide">Florae</span>
+        </div>
+        <button id="mobile-menu-btn" class="text-white hover:text-emerald-300 focus:outline-none p-2 rounded-lg bg-emerald-800/50">
+            <i class="fa-solid fa-bars text-2xl"></i>
+        </button>
+    </header>
+
+    <!-- Mobile Overlay -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-10 hidden md:hidden transition-opacity duration-300 opacity-0"></div>
+
+    <!-- Sidebar / Sidebar Navigation -->
+    <aside id="sidebar" class="fixed md:sticky top-0 hidden md:flex flex-col w-64 bg-emerald-950 text-stone-100 h-screen p-6 shadow-xl z-20 transition-all duration-300 -translate-x-full md:translate-x-0 flex-shrink-0">
+        <div class="hidden md:flex items-center space-x-3 mb-8 px-2">
+            <div class="bg-emerald-800 p-2 rounded-xl text-emerald-300">
+                <i class="fa-solid fa-leaf text-2xl"></i>
+            </div>
+            <div>
+                <h1 class="font-serif text-2xl font-bold tracking-wide text-white leading-none">Florae</h1>
+                <span class="text-xs text-emerald-300 font-medium tracking-widest uppercase">Plant Care Assistant</span>
+            </div>
+        </div>
+
+        <!-- Navigation Links -->
+        <nav class="space-y-2 flex-grow">
+            <a href="/" class="flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-emerald-900/50 transition-all duration-200 {% if request.path == '/' %} bg-emerald-800 text-white font-semibold {% else %} text-emerald-100/80 {% endif %}">
+                <i class="fa-solid fa-grip text-lg w-6 text-center"></i>
+                <span>Bacheca</span>
+            </a>
+            <a href="/plants" class="flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-emerald-900/50 transition-all duration-200 {% if request.path.startswith('/plants') or request.path.startswith('/plant/') %} bg-emerald-800 text-white font-semibold {% else %} text-emerald-100/80 {% endif %}">
+                <i class="fa-solid fa-seedling text-lg w-6 text-center"></i>
+                <span>Le mie Piante</span>
+            </a>
+            <a href="/wishlist" class="flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-emerald-900/50 transition-all duration-200 {% if request.path == '/wishlist' %} bg-emerald-800 text-white font-semibold {% else %} text-emerald-100/80 {% endif %}">
+                <i class="fa-solid fa-heart text-lg w-6 text-center"></i>
+                <span>Wishlist</span>
+            </a>
+            <a href="/diagnose" class="flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-emerald-900/50 transition-all duration-200 {% if request.path == '/diagnose' %} bg-emerald-800 text-white font-semibold {% else %} text-emerald-100/80 {% endif %}">
+                <i class="fa-solid fa-wand-magic-sparkles text-lg w-6 text-center"></i>
+                <span>Analisi IA & Foto</span>
+            </a>
+            <a href="/settings" class="flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-emerald-900/50 transition-all duration-200 {% if request.path == '/settings' %} bg-emerald-800 text-white font-semibold {% else %} text-emerald-100/80 {% endif %}">
+                <i class="fa-solid fa-sliders text-lg w-6 text-center"></i>
+                <span>Impostazioni</span>
+            </a>
+        </nav>
+
+        <!-- Current Season Card -->
+        <div class="mt-auto bg-emerald-900/50 rounded-2xl p-4 border border-emerald-800/60">
+            <div class="flex items-center space-x-2 text-emerald-300 text-xs font-semibold tracking-wider uppercase mb-1">
+                <i class="fa-solid fa-calendar-day"></i>
+                <span>Stagione Attiva</span>
+            </div>
+            <div class="text-white font-bold font-serif text-lg mb-1">
+                {% if current_season == "Primavera" %}
+                    <i class="fa-solid fa-seedling text-pink-400 mr-1"></i> Primavera
+                {% elif current_season == "Estate" %}
+                    <i class="fa-solid fa-sun text-yellow-400 mr-1"></i> Estate
+                {% elif current_season == "Autunno" %}
+                    <i class="fa-solid fa-leaf text-amber-500 mr-1"></i> Autunno
+                {% else %}
+                    <i class="fa-solid fa-snowflake text-sky-300 mr-1"></i> Inverno
+                {% endif %}
+            </div>
+            <p class="text-xs text-stone-300">Periodo di {{ current_month }}. Vedi i compiti stagionali in bacheca.</p>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow flex flex-col min-w-0">
+        <!-- Messages/Alerts Container -->
+        <div class="px-6 pt-6 max-w-7xl w-full mx-auto">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="mb-4 p-4 rounded-xl flex items-center justify-between border shadow-sm transition-all duration-300 
+                            {% if category == 'success' %} bg-emerald-50 border-emerald-200 text-emerald-800
+                            {% elif category == 'error' %} bg-rose-50 border-rose-200 text-rose-800
+                            {% elif category == 'info' %} bg-sky-50 border-sky-200 text-sky-800
+                            {% else %} bg-amber-50 border-amber-200 text-amber-800 {% endif %}">
+                            <div class="flex items-center space-x-3">
+                                {% if category == 'success' %}
+                                    <i class="fa-solid fa-circle-check text-xl text-emerald-500"></i>
+                                {% elif category == 'error' %}
+                                    <i class="fa-solid fa-circle-exclamation text-xl text-rose-500"></i>
+                                {% else %}
+                                    <i class="fa-solid fa-circle-info text-xl text-sky-500"></i>
+                                {% endif %}
+                                <span class="font-medium text-sm md:text-base">{{ message }}</span>
+                            </div>
+                            <button onclick="this.parentElement.remove()" class="text-stone-400 hover:text-stone-600 transition-colors">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        <!-- Rendered Child Template -->
+        <div class="p-6 max-w-7xl w-full mx-auto flex-grow">
+            {% block content %}{% endblock %}
+        </div>
+
+        <!-- Footer -->
+        <footer class="bg-stone-100 border-t border-stone-200 py-6 mt-12 text-center text-stone-500 text-sm">
+            <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center">
+                <div class="flex items-center space-x-2 text-stone-700 font-serif font-semibold">
+                    <i class="fa-solid fa-leaf text-emerald-600"></i>
+                    <span>Florae Tracker</span>
+                </div>
+                <p class="mt-2 md:mt-0">&copy; 2026 Plant AI Tracker. Custodisci il tuo pollice verde con l'IA.</p>
+            </div>
+        </footer>
+    </main>
+
+    <!-- Mobile Nav Javascript -->
+    <script>
+        const mobileBtn = document.getElementById('mobile-menu-btn');
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+
+        function toggleMenu() {
+            const isOpen = !sidebar.classList.contains('-translate-x-full');
+            
+            if (isOpen) {
+                // Close
+                sidebar.classList.add('-translate-x-full');
+                sidebar.classList.add('hidden');
+                overlay.classList.add('hidden');
+                overlay.classList.remove('opacity-100');
+            } else {
+                // Open
+                sidebar.classList.remove('hidden');
+                sidebar.classList.remove('-translate-x-full');
+                sidebar.classList.add('flex');
+                overlay.classList.remove('hidden');
+                setTimeout(() => overlay.classList.add('opacity-100'), 10);
+            }
+        }
+
+        mobileBtn.addEventListener('click', toggleMenu);
+        overlay.addEventListener('click', toggleMenu);
+    </script>
+</body>
+</html>

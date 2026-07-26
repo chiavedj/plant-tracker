@@ -1,0 +1,286 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="space-y-8">
+    
+    <!-- Top Greeting & Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-4xl font-extrabold text-stone-900 tracking-tight mb-2">Bacheca Cura Piante</h1>
+            <p class="text-stone-600">Oggi è il periodo di <span class="text-emerald-700 font-semibold font-serif text-lg">{{ current_month }}</span>. Ecco lo stato attuale delle tue piante e i compiti da completare.</p>
+        </div>
+        <!-- Quick Action Buttons -->
+        <div class="flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-3 w-full sm:w-auto">
+            <a href="/diagnose" class="w-full sm:w-auto text-center bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-5 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center space-x-2">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <span>Analisi Foto IA</span>
+            </a>
+            <button onclick="document.getElementById('add-task-modal').classList.remove('hidden')" class="w-full sm:w-auto bg-white border border-stone-200 hover:bg-stone-50 text-stone-700 font-semibold px-4 py-3 rounded-xl shadow-sm transition-all flex items-center justify-center space-x-2">
+                <i class="fa-solid fa-plus text-emerald-600"></i>
+                <span>Nuovo Compito</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Quick Stats Row -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white p-6 rounded-3xl border border-stone-200/80 shadow-sm flex items-center space-x-4">
+            <div class="bg-emerald-100 p-4 rounded-2xl text-emerald-700">
+                <i class="fa-solid fa-seedling text-3xl"></i>
+            </div>
+            <div>
+                <span class="block text-stone-500 text-sm font-medium">Piante Tracciate</span>
+                <span class="text-3xl font-bold text-stone-900">{{ plants_count }}</span>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-3xl border border-stone-200/80 shadow-sm flex items-center space-x-4">
+            <div class="bg-amber-100 p-4 rounded-2xl text-amber-700">
+                <i class="fa-solid fa-circle-exclamation text-3xl"></i>
+            </div>
+            <div>
+                <span class="block text-stone-500 text-sm font-medium">Attività Pendenti</span>
+                <span class="text-3xl font-bold text-stone-900">{{ pending_count }}</span>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-br from-emerald-800 to-emerald-950 p-6 rounded-3xl text-white shadow-md relative overflow-hidden">
+            <div class="absolute -right-6 -bottom-6 text-white/10 text-9xl">
+                <i class="fa-solid fa-brain"></i>
+            </div>
+            <div class="relative z-10">
+                <span class="block text-emerald-200 text-xs font-semibold uppercase tracking-wider mb-1">Diagnostica Avanzata</span>
+                <h3 class="font-serif text-xl font-bold mb-1">Vedi un problema?</h3>
+                <p class="text-xs text-stone-200 mb-3">Carica una foto e lascia che l'IA rilevi sintomi e trovi la soluzione.</p>
+                <a href="/diagnose" class="bg-white/20 hover:bg-white/35 text-white font-semibold text-xs px-3 py-2 rounded-lg transition-all inline-block">Analizza Foto Adesso</a>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 1. CRITICAL / URGENT TASKS (HIGHLIGHTED AT THE TOP) -->
+    <div class="space-y-4">
+        <div class="flex items-center space-x-3">
+            <div class="bg-rose-500 h-3 w-3 rounded-full animate-pulse"></div>
+            <h2 class="text-2xl font-bold text-stone-900">In Evidenza: Da Fare Assolutamente</h2>
+        </div>
+
+        {% if urgent_tasks %}
+            <div class="grid grid-cols-1 gap-4">
+                {% for task in urgent_tasks %}
+                    <div class="bg-rose-50 border-2 border-rose-200 rounded-3xl p-6 shadow-md transition-all hover:border-rose-300 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div class="flex items-start space-x-4">
+                            <div class="bg-rose-100 text-rose-600 p-3 rounded-2xl flex-shrink-0 mt-1">
+                                <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                            </div>
+                            <div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="bg-rose-600 text-white text-[10px] uppercase font-extrabold tracking-widest px-2.5 py-0.5 rounded-full">URGENTE</span>
+                                    {% if task.plant %}
+                                        <span class="text-rose-800 text-xs font-semibold bg-rose-100/50 px-2 py-0.5 rounded-md">{{ task.plant.name }}</span>
+                                    {% endif %}
+                                </div>
+                                <h3 class="text-xl font-bold text-stone-900 mt-1.5">{{ task.title }}</h3>
+                                <p class="text-stone-700 text-sm mt-1 leading-relaxed whitespace-pre-line">{{ task.description }}</p>
+                                <span class="inline-block text-xs text-rose-700 font-bold mt-2 bg-rose-100 px-2.5 py-1 rounded-lg">Scadenza: {{ task.due_date }}</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2 justify-end flex-shrink-0">
+                            <a href="/task/complete/{{ task.id }}" class="bg-rose-600 hover:bg-rose-700 text-white font-bold px-5 py-3 rounded-2xl shadow-sm transition-all flex items-center space-x-2">
+                                <i class="fa-solid fa-check"></i>
+                                <span>Segna come Fatto</span>
+                            </a>
+                            <a href="/task/delete/{{ task.id }}" class="text-stone-400 hover:text-rose-600 p-3 rounded-xl transition-colors" title="Elimina compito">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </a>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="bg-emerald-50 border border-emerald-100 rounded-3xl p-8 text-center">
+                <div class="bg-emerald-100 text-emerald-700 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i class="fa-solid fa-circle-check text-2xl"></i>
+                </div>
+                <h3 class="font-serif text-lg font-bold text-emerald-950">Nessuna urgenza critica!</h3>
+                <p class="text-sm text-stone-600 mt-1">Ottimo lavoro! Tutte le tue piante sono monitorate e non ci sono azioni urgenti in sospeso.</p>
+            </div>
+        {% endif %}
+    </div>
+
+
+    <!-- 2. STANDARD / PENDING TASKS SECTION -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- Left 2 Columns: Other Tasks list -->
+        <div class="lg:col-span-2 space-y-4">
+            <h2 class="text-2xl font-bold text-stone-900 flex items-center space-x-2">
+                <i class="fa-solid fa-clipboard-list text-emerald-700"></i>
+                <span>Altre cose da fare</span>
+            </h2>
+
+            {% if pending_tasks %}
+                <div class="bg-white rounded-3xl border border-stone-200/80 shadow-sm divide-y divide-stone-100 overflow-hidden">
+                    {% for task in pending_tasks %}
+                        <div class="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-stone-50/50 transition-colors">
+                            <div class="flex items-start space-x-3.5">
+                                <div class="bg-emerald-50 text-emerald-700 p-2.5 rounded-xl flex-shrink-0 mt-0.5">
+                                    <i class="fa-solid fa-clock-rotate-left"></i>
+                                </div>
+                                <div>
+                                    <div class="flex items-center space-x-2">
+                                        {% if task.plant %}
+                                            <span class="text-emerald-800 text-[11px] font-bold bg-emerald-50 px-2 py-0.5 rounded-md">{{ task.plant.name }}</span>
+                                        {% else %}
+                                            <span class="text-stone-500 text-[11px] font-bold bg-stone-100 px-2 py-0.5 rounded-md">Generale</span>
+                                        {% endif %}
+                                        <span class="text-stone-400 text-xs">• Scade: {{ task.due_date }}</span>
+                                    </div>
+                                    <h4 class="text-lg font-bold text-stone-900 mt-1">{{ task.title }}</h4>
+                                    {% if task.description %}
+                                        <p class="text-stone-600 text-sm mt-1 whitespace-pre-line">{{ task.description }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2 justify-end md:flex-shrink-0">
+                                <a href="/task/complete/{{ task.id }}" class="bg-stone-100 hover:bg-emerald-600 hover:text-white text-stone-700 font-semibold px-4 py-2.5 rounded-xl text-sm shadow-sm transition-all flex items-center space-x-1.5">
+                                    <i class="fa-solid fa-check"></i>
+                                    <span>Completa</span>
+                                </a>
+                                <a href="/task/delete/{{ task.id }}" class="text-stone-400 hover:text-rose-600 p-2 rounded-lg transition-colors">
+                                    <i class="fa-solid fa-trash-can text-sm"></i>
+                                </a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="bg-white rounded-3xl border border-stone-200/80 p-8 text-center text-stone-500 shadow-sm">
+                    <p>Nessuna altra attività programmata. Clicca su "Nuovo Compito" per aggiungerne uno.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Right Column: Seasonal Care Tips dynamically filtered for the Active Season -->
+        <div class="space-y-4">
+            <h2 class="text-2xl font-bold text-stone-900 flex items-center space-x-2">
+                <i class="fa-solid fa-wand-magic text-emerald-700"></i>
+                <span>Cura in {{ current_season }}</span>
+            </h2>
+            
+            <div class="bg-emerald-900 text-stone-100 rounded-3xl p-6 shadow-md border border-emerald-800 space-y-4">
+                <p class="text-xs text-emerald-200 font-semibold uppercase tracking-wider">GUIDA STAGIONALE • {{ current_season | upper }}</p>
+                
+                {% if plants %}
+                    <div class="divide-y divide-emerald-800/80 space-y-3">
+                        {% for plant in plants %}
+                            <div class="pt-3 first:pt-0">
+                                <h4 class="font-serif font-bold text-white text-base">{{ plant.name }}</h4>
+                                <p class="text-xs text-emerald-300 italic mb-1">{{ plant.species or 'Specie generica' }}</p>
+                                
+                                <p class="text-xs text-stone-200 mt-1 leading-relaxed bg-emerald-950/40 p-2.5 rounded-lg border border-emerald-800/30">
+                                    {% if current_season_attr == "spring_care" %}
+                                        {{ plant.spring_care or "Prenditi cura della pianta in primavera." }}
+                                    {% elif current_season_attr == "summer_care" %}
+                                        {{ plant.summer_care or "Prenditi cura della pianta in estate." }}
+                                    {% elif current_season_attr == "autumn_care" %}
+                                        {{ plant.autumn_care or "Prenditi cura della pianta in autunno." }}
+                                    {% else %}
+                                        {{ plant.winter_care or "Prenditi cura della pianta in inverno." }}
+                                    {% endif %}
+                                </p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-xs text-stone-300">Non hai ancora inserito piante. Vai nella sezione <a href="/plants" class="underline text-white font-semibold">Le mie Piante</a> per aggiungerne una e vedere i consigli qui.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 3. COMPLETED RECENTLY -->
+    {% if completed_tasks %}
+        <div class="pt-4 border-t border-stone-200">
+            <h3 class="text-lg font-bold text-stone-600 mb-3 flex items-center space-x-2">
+                <i class="fa-solid fa-circle-check text-stone-400"></i>
+                <span>Completati di recente</span>
+            </h3>
+            <div class="bg-stone-100 rounded-2xl p-4 divide-y divide-stone-200/60 max-w-2xl">
+                {% for task in completed_tasks %}
+                    <div class="py-2 flex justify-between items-center text-xs text-stone-500 first:pt-0 last:pb-0">
+                        <div class="flex items-center space-x-2 line-through text-stone-400">
+                            <i class="fa-solid fa-check text-emerald-600"></i>
+                            <span>{{ task.title }}</span>
+                        </div>
+                        <span class="text-[10px] bg-stone-200 text-stone-600 px-2 py-0.5 rounded-full">Completato</span>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+</div>
+
+<!-- ADD TASK MODAL -->
+<div id="add-task-modal" class="hidden fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden border border-stone-100 animate-in fade-in zoom-in duration-200">
+        <!-- Header -->
+        <div class="bg-emerald-950 text-white p-6 flex justify-between items-center">
+            <h3 class="text-xl font-bold font-serif">Pianifica Nuovo Compito</h3>
+            <button onclick="document.getElementById('add-task-modal').classList.add('hidden')" class="text-stone-300 hover:text-white">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
+        <!-- Form -->
+        <form action="/task/add" method="POST" class="p-6 space-y-4">
+            
+            <div>
+                <label class="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1">Associa a Pianta (Opzionale)</label>
+                <select name="plant_id" class="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                    <option value="">Nessuna (Compito Generale)</option>
+                    {% for plant in plants %}
+                        <option value="{{ plant.id }}">{{ plant.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1">Titolo dell'Attività *</label>
+                <input type="text" name="title" required placeholder="Es. Innaffia la Monstera, Cambia vaso, Concima" 
+                       class="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1">Dettagli / Note</label>
+                <textarea name="description" rows="3" placeholder="Aggiungi indicazioni specifiche su dosi, problemi o accorgimenti..."
+                          class="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"></textarea>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1">Scadenza</label>
+                    <input type="text" name="due_date" placeholder="Es: Oggi, Weekend, 25 Giugno" 
+                           class="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                </div>
+                <div class="flex items-center space-x-2 pt-6">
+                    <input type="checkbox" name="is_urgent" id="is_urgent_box" value="1" class="h-5 w-5 text-emerald-600 focus:ring-emerald-500 border-stone-300 rounded">
+                    <label for="is_urgent_box" class="text-sm font-semibold text-rose-700 flex items-center space-x-1.5 cursor-pointer">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <span>Segna come Urgente!</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="pt-4 flex justify-end space-x-3">
+                <button type="button" onclick="document.getElementById('add-task-modal').classList.add('hidden')" 
+                        class="px-4 py-2 text-stone-500 hover:text-stone-700 font-semibold text-sm">Annulla</button>
+                <button type="submit" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-6 py-2.5 rounded-xl text-sm shadow-md transition-all">
+                    Pianifica Compito
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
