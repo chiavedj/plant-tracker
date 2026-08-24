@@ -8,6 +8,8 @@ from werkzeug.utils import secure_filename
 import json
 import google.generativeai as genai
 
+__version__ = "1.1.0"  # Fonte unica della versione (vedi CHANGELOG.md)
+
 app = Flask(__name__)
 app.secret_key = "plant_tracker_super_secret_key"
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///plants.db'

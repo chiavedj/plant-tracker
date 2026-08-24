@@ -1,8 +1,10 @@
 # 🌿 Florae - Plant Care Tracker & AI Diagnosis
 
+![Version](https://img.shields.io/badge/version-1.1.0-emerald) ![Python](https://img.shields.io/badge/python-3.9%2B-blue) ![Flask](https://img.shields.io/badge/flask-3.0-grey) ![License](https://img.shields.io/badge/license-MIT-green)
+
 ![Florae Screenshot](flore.png)
 
-Florae is a local-first web application for tracking and caring for your plants, integrated with an AI-powered photo diagnosis system (OpenAI GPT-4o-mini).
+Florae is a local-first web application for tracking and caring for your plants, integrated with an AI-powered photo diagnosis system. Choose your favorite AI provider (**OpenAI** or **Google Gemini**) and pick the **model that fits your budget** — from ultra-cheap mini/flash models up to premium ones.
 
 ## ✨ Key Features
 
@@ -10,7 +12,8 @@ Florae is a local-first web application for tracking and caring for your plants,
 2. **Seasonal Care Tracking**: Dynamic care tips based on the current month for each plant in your database.
 3. **Personal Botanical Database**: Manage and browse detailed plant cards (light exposure, watering needs, general care, seasonal calendar).
 4. **AI Photo Diagnosis**: Upload a photo of struggling leaves or stems. The AI identifies the plant, diagnoses the disease/problem, and suggests a detailed treatment. Click "Apply & Save to Database" to automatically add the task to your urgent dashboard!
-5. **Smart Simulation Mode**: No OpenAI API key yet? The app simulates incredibly realistic botanical diagnoses so you can test the full workflow. Add your real key anytime from the Settings page.
+5. **AI Model Selection** 🆕: From the Settings page, choose exactly which AI model to use — cheap options like *GPT-4o mini* or *Gemini Flash* are recommended and cost only a fraction of premium models.
+6. **Smart Simulation Mode**: No API key yet? The app simulates incredibly realistic botanical diagnoses so you can test the full workflow. Add your real key anytime from the Settings page.
 
 ---
 
@@ -52,9 +55,15 @@ The app runs on port **5001** (avoids AirPlay conflict on macOS):
 
 ---
 
-## 🛠️ OpenAI API Key Setup (Optional)
+## 🛠️ AI Provider & Model Setup (Optional)
 
 To enable real AI-powered photo analysis:
 1. Launch the app and go to **Settings** from the sidebar.
-2. Paste your OpenAI API key (starts with `sk-...`).
-3. Click **Save Configuration**. The app will now use the `gpt-4o-mini` vision model for real image diagnosis!
+2. Pick your **provider**: OpenAI or Google Gemini.
+3. Paste your API key:
+   - **OpenAI** → starts with `sk-...`, get one at [platform.openai.com](https://platform.openai.com/)
+   - **Google** → starts with `AIzaSy...`, get one at [aistudio.google.com](https://aistudio.google.com/)
+4. Choose the **AI model** from the list — budget models (mini / flash / nano) work great for plant diagnosis at a fraction of the cost.
+5. Click **Save Configuration**. Done! 🌱
+
+> 💡 Keys are updated only when you type something in the field — leaving it blank keeps the previously saved key.

@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  syntax-and-import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Installa dipendenze
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verifica sintassi di tutti i file .py
+        run: python -m compileall -q app.py list_models.py
+
+      - name: Smoke test avvio applicazione e rotte
+        env:
+          TESTING: "1"
+        run: |
+          python - <<'EOF'
+          import os, warnings
+          warnings.filterwarnings("ignore")
+          import app as appmod
+          app = appmod.app
+          app.config["SERVER_NAME"] = "localhost"
+
+          with app.app_context():
+              appmod.db.create_all()
+              # Migrazione leggera colonna ai_model (come in produzione)
+              from sqlalchemy import text
+              with appmod.db.engine.connect() as conn:
+                  cols = [r[1] for r in conn.execute(text("PRAGMA table_info(settings)"))]
+                  if "ai_model" not in cols:
+                      conn.execute(text("ALTER TABLE settings ADD COLUMN ai_model VARCHAR(100)"))
+                      conn.commit()
+
+          client = app.test_client()
+          for path in ["/", "/plants", "/wishlist", "/diagnose", "/settings"]:
+              resp = client.get(path)
+              assert resp.status_code == 200, f"{path} -> {resp.status_code}"
+          print("Tutte le rotte rispondono correttamente ✔")
+          EOF

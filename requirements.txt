@@ -1,0 +1,9 @@
+# Florae – Plant Tracker · Dipendenze dirette
+# Installa con: pip install -r requirements.txt
+
+Flask==3.0.3
+Flask-SQLAlchemy==3.1.1
+Werkzeug==3.1.8
+SQLAlchemy==2.0.51
+openai>=1.40,<3
+google-generativeai==0.8.6
