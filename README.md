@@ -1,6 +1,6 @@
 # 🌿 Florae - Plant Care Tracker & AI Diagnosis
 
-![Version](https://img.shields.io/badge/version-1.1.0-emerald) ![Python](https://img.shields.io/badge/python-3.9%2B-blue) ![Flask](https://img.shields.io/badge/flask-3.0-grey) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-1.1.1-emerald) ![Python](https://img.shields.io/badge/python-3.9%2B-blue) ![Flask](https://img.shields.io/badge/flask-3.0-grey) ![License](https://img.shields.io/badge/license-MIT-green) ![Docker](https://img.shields.io/badge/docker-ghcr.io-2496ED)
 
 ![Florae Screenshot](flore.png)
 
@@ -52,6 +52,29 @@ python3 app.py
 ### 4. Open in Browser
 The app runs on port **5001** (avoids AirPlay conflict on macOS):
 👉 **[http://127.0.0.1:5001](http://127.0.0.1:5001)**
+
+---
+
+## 🐳 Deploy con Docker / ZimaOS
+
+L'app è disponibile come immagine Docker pronta su GitHub Container Registry.
+
+**Su ZimaOS:**
+1. Apri il pannello App/Docker di ZimaOS e crea (o modifica) l'app usando questa immagine:
+   ```
+   ghcr.io/chiavedj/plant-tracker:latest
+   ```
+2. Mappa la porta **5001** (es. `5001:5001`).
+3. Aggiungi un volume per il database: `/app/instance` → così i tuoi dati sopravvivono agli aggiornamenti.
+4. Quando esce una nuova versione, aggiorna l'immagine da ZimaOS e ricrea il container: le impostazioni e i dati restano al loro posto.
+
+**Con docker-compose** (su qualunque server):
+```bash
+docker compose up -d
+```
+Il file `docker-compose.yml` nel repo è già configurato con volumi persistenti per database (`florae-data`) e foto caricate (`florae-uploads`).
+
+> ⚠️ Dopo un aggiornamento dell'immagine, fai sempre un hard refresh del browser (`Cmd/Ctrl+Shift+R`) per non vedere pagine vecchie dalla cache.
 
 ---
 

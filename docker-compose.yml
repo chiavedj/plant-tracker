@@ -1,0 +1,23 @@
+# Florae · Plant Tracker — deployment Docker / ZimaOS
+#
+# Uso locale:      docker compose up -d --build
+# Su ZimaOS usa l'immagine pronta da GitHub (vedi README):
+#   ghcr.io/chiavedj/plant-tracker:latest
+services:
+  plant-tracker:
+    image: ghcr.io/chiavedj/plant-tracker:latest
+    # Per compilare localmente invece di scaricare l'immagine:
+    # build: .
+    container_name: florae
+    ports:
+      - "5001:5001"
+    volumes:
+      # Database persistente tra aggiornamenti dell'immagine
+      - florae-data:/app/instance
+      # Foto caricate dagli utenti persistenti
+      - florae-uploads:/app/static/uploads
+    restart: unless-stopped
+
+volumes:
+  florae-data:
+  florae-uploads:

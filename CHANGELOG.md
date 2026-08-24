@@ -5,6 +5,16 @@ Tutte le modifiche importanti a questo progetto vengono documentate in questo fi
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/it/1.1.0/)
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.1.1] – 2025-08-24
+
+### Aggiunto
+- Immagine Docker ufficiale pubblicata automaticamente su GitHub Container Registry (`ghcr.io/chiavedj/plant-tracker`) ad ogni nuova versione
+- `Dockerfile`, `docker-compose.yml` e `.dockerignore` per deployment su server/NAS (ZimaOS incluso)
+- Volumi persistenti documentati per database (`/app/instance`) e foto caricate (`/app/static/uploads`)
+
+### Modificato
+- Modalità debug di Flask disattivata nel container (variabile `FLASK_DEBUG=0`), attiva di default solo in sviluppo locale
+
 ## [1.1.0] – 2025-08-24
 
 ### Aggiunto

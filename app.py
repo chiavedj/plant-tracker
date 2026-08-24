@@ -8,7 +8,7 @@ from werkzeug.utils import secure_filename
 import json
 import google.generativeai as genai
 
-__version__ = "1.1.0"  # Fonte unica della versione (vedi CHANGELOG.md)
+__version__ = "1.1.1"  # Fonte unica della versione (vedi CHANGELOG.md)
 
 app = Flask(__name__)
 app.secret_key = "plant_tracker_super_secret_key"
@@ -952,4 +952,6 @@ if __name__ == '__main__':
             db.session.add(t2)
             db.session.commit()
 
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    # Debug attivo solo in sviluppo locale (FLASK_DEBUG non impostato);
+    # nel container Docker è disattivato via ENV FLASK_DEBUG=0
+    app.run(host='0.0.0.0', port=5001, debug=os.environ.get('FLASK_DEBUG', '1') == '1')

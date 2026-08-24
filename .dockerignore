@@ -1,0 +1,25 @@
+# Mai dentro l'immagine
+venv/
+env/
+.git/
+.github/
+__pycache__/
+*.pyc
+*.pyo
+
+# Dati locali e sensibili
+instance/
+*.db
+*.sqlite3
+*.log
+.env
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# File non necessari al runtime
+flore.png
+README.md
+CHANGELOG.md
+LICENSE
