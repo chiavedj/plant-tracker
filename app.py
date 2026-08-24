@@ -1,7 +1,8 @@
 import os
+import re
 import base64
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 import json
@@ -58,12 +59,38 @@ class Task(db.Model):
     status = db.Column(db.String(20), default='pending')  # pending, completed
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+# Modelli IA disponibili, suddivisi per provider
+AI_MODELS = {
+    'openai': [
+        {'id': 'gpt-4o-mini', 'name': 'GPT-4o mini', 'desc': 'Economico e veloce (consigliato)', 'icon': 'fa-feather'},
+        {'id': 'gpt-4.1-nano', 'name': 'GPT-4.1 nano', 'desc': 'Il più economico in assoluto', 'icon': 'fa-seedling'},
+        {'id': 'gpt-4.1-mini', 'name': 'GPT-4.1 mini', 'desc': 'Buon compromesso qualità/prezzo', 'icon': 'fa-scale-balanced'},
+        {'id': 'gpt-4o', 'name': 'GPT-4o', 'desc': 'Massima qualità, più costoso', 'icon': 'fa-gem'},
+    ],
+    'google': [
+        {'id': 'models/gemini-3.6-flash', 'name': 'Gemini 3.6 Flash', 'desc': 'Veloce ed economico (consigliato)', 'icon': 'fa-feather'},
+        {'id': 'models/gemini-2.5-flash', 'name': 'Gemini 2.5 Flash', 'desc': 'Più intelligente, costo moderato', 'icon': 'fa-scale-balanced'},
+        {'id': 'models/gemini-flash-latest', 'name': 'Gemini Flash Latest', 'desc': 'Ultima versione flash disponibile', 'icon': 'fa-wand-magic-sparkles'},
+    ]
+}
+
 class Settings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ai_provider = db.Column(db.String(50), default='openai')
+    ai_model = db.Column(db.String(100), nullable=True)  # Modello scelto dall'utente
     openai_api_key = db.Column(db.String(500), nullable=True)
     google_api_key = db.Column(db.String(500), nullable=True)
     openrouter_api_key = db.Column(db.String(500), nullable=True)
+
+# Helper to get the AI model chosen by the user for a given provider
+def get_selected_model(settings, provider):
+    """Restituisce il modello scelto dall'utente, oppure il primo consigliato."""
+    saved = (settings.ai_model or '').strip()
+    valid_ids = [m['id'] for m in AI_MODELS.get(provider, [])]
+    if saved in valid_ids:
+        return saved
+    # Default: primo modello della lista (sempre quello economico/consigliato)
+    return valid_ids[0] if valid_ids else None
 
 # Helper to get/init app settings
 def get_app_settings():
@@ -73,6 +100,20 @@ def get_app_settings():
         db.session.add(setting)
         db.session.commit()
     return setting
+
+def clean_ai_json(text):
+    """Rimuove eventuali blocchi di codice markdown dalla risposta dell'IA."""
+    text = (text or '').strip()
+    # Rimuove fence ```json ... ``` oppure ``` ... ```
+    match = re.search(r'```(?:json)?\s*(.*?)\s*```', text, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    # Fallback: estrae il primo blocco { ... } valido
+    start = text.find('{')
+    end = text.rfind('}')
+    if start != -1 and end > start:
+        return text[start:end+1]
+    return text
 
 # Context processor to expose current season and month
 @app.context_processor
@@ -180,9 +221,10 @@ def analyze_plant_image(image_path, plant_name, species_hint=""):
             with open(image_path, "rb") as image_file:
                 base64_image = base64.b64encode(image_file.read()).decode('utf-8')
 
+            selected_model = get_selected_model(settings, 'openai')
             client = openai.OpenAI(api_key=api_key)
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=selected_model,
                 messages=[
                     {
                         "role": "user",
@@ -205,12 +247,15 @@ def analyze_plant_image(image_path, plant_name, species_hint=""):
         else: # Google Gemini / Gemma
             genai.configure(api_key=api_key)
             
-            # Exact names from your API model list
-            models_to_try = [
-                'models/gemma-4-31b-it', 
-                'models/gemini-2.5-flash', 
-                'models/gemini-2.0-flash', 
-                'models/gemini-flash-latest'
+            # Il modello scelto dall'utente viene provato per primo,
+            # poi eventuali fallback nello stesso listino
+            preferred = get_selected_model(settings, 'google')
+            models_to_try = [preferred] + [
+                m for m in [
+                    'models/gemini-3.6-flash',
+                    'models/gemini-2.5-flash', 
+                    'models/gemini-flash-latest'
+                ] if m != preferred
             ]
             
             result = None
@@ -241,13 +286,7 @@ def analyze_plant_image(image_path, plant_name, species_hint=""):
                     )
                     
                     if response and response.text:
-                        text_response = response.text.strip()
-                        if text_response.startswith("```json"):
-                            text_response = text_response[7:]
-                        if text_response.endswith("```"):
-                            text_response = text_response[:-3]
-                        
-                        result = json.loads(text_response.strip())
+                        result = json.loads(clean_ai_json(response.text))
                         result["model_used"] = model_name
                         print(f"Success with model: {model_name}")
                         break
@@ -258,9 +297,9 @@ def analyze_plant_image(image_path, plant_name, species_hint=""):
             
             if result is None:
                 raise Exception(f"Tutti i modelli provati hanno fallito. Ultimo errore: {last_error}")
-            
-            return result
 
+        # Nota: niente 'return' anticipato nel ramo Google,
+        # così is_mock viene impostato correttamente per TUTTI i provider
         result["is_mock"] = False
         return result
 
@@ -305,14 +344,14 @@ def get_best_purchase_time(plant_name, species=""):
             import openai
             client = openai.OpenAI(api_key=api_key)
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=get_selected_model(settings, 'openai'),
                 messages=[{"role": "user", "content": prompt}]
             )
             return response.choices[0].message.content.strip()
         
         else: # Google Gemini / Gemma
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('models/gemini-2.0-flash')
+            model = genai.GenerativeModel(get_selected_model(settings, 'google'))
             response = model.generate_content(prompt)
             return response.text.strip()
             
@@ -367,7 +406,7 @@ def get_seasonal_suggestions():
             import openai
             client = openai.OpenAI(api_key=api_key)
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=get_selected_model(settings, 'openai'),
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"}
             )
@@ -377,11 +416,9 @@ def get_seasonal_suggestions():
         
         else: # Google Gemini
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('models/gemini-2.0-flash')
+            model = genai.GenerativeModel(get_selected_model(settings, 'google'))
             response = model.generate_content(prompt)
-            text = response.text.strip()
-            if text.startswith("```json"): text = text[7:].rstrip("```")
-            data = json.loads(text)
+            data = json.loads(clean_ai_json(response.text))
             suggestions = data.get("suggestions", [])
             return suggestions if suggestions else default_suggestions
             
@@ -423,22 +460,28 @@ def list_plants():
 
 @app.route('/plant/add', methods=['POST'])
 def add_plant():
-    name = request.form.get('name')
+    name = (request.form.get('name') or '').strip()
+    if not name:
+        flash("Il nome della pianta è obbligatorio!", "error")
+        return redirect(url_for('list_plants'))
     species = request.form.get('species')
     exposure = request.form.get('exposure')
     watering = request.form.get('watering')
     care = request.form.get('care')
     
-    spring_care = request.form.get('spring_care', "Ricomincia a concimare una volta al mese. Innaffia con più regolarità.")
-    summer_care = request.form.get('summer_care', "Innaffia frequentemente, controllando che il terreno non si secchi del tutto. Proteggi dai raggi solari troppo intensi.")
-    autumn_care = request.form.get('autumn_care', "Riduci gradualmente le annaffiature. Sospendi le concimazioni. Riporta in casa se la pianta soffre il freddo.")
-    winter_care = request.form.get('winter_care', "Innaffia solo sporadicamente. Assicurati che la stanza sia luminosa e lontana dai termosifoni.")
+    spring_care = (request.form.get('spring_care') or '').strip() or "Ricomincia a concimare una volta al mese. Innaffia con più regolarità."
+    summer_care = (request.form.get('summer_care') or '').strip() or "Innaffia frequentemente, controllando che il terreno non si secchi del tutto. Proteggi dai raggi solari troppo intensi."
+    autumn_care = (request.form.get('autumn_care') or '').strip() or "Riduci gradualmente le annaffiature. Sospendi le concimazioni. Riporta in casa se la pianta soffre il freddo."
+    winter_care = (request.form.get('winter_care') or '').strip() or "Innaffia solo sporadicamente. Assicurati che la stanza sia luminosa e lontana dai termosifoni."
     
     # Handle image upload
     image_file = request.files.get('image')
     image_url = None
     if image_file and image_file.filename != '':
         filename = secure_filename(image_file.filename)
+        # Fallback se secure_filename svuota il nome (es. caratteri non-ASCII)
+        if not filename:
+            filename = f"pianta_{int(datetime.now().timestamp())}.jpg"
         # Append timestamp to avoid overwrite
         filename = f"{int(datetime.now().timestamp())}_{filename}"
         image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
@@ -492,7 +535,7 @@ def plant_details(id):
         "summer_care": plant.summer_care,
         "autumn_care": plant.autumn_care,
         "winter_care": plant.winter_care,
-        "image_url": plant.image_url or '/static/img/placeholder.png',
+        "image_url": plant.image_url or '/static/img/placeholder.svg',
         "tasks": tasks_list  # Inviamo la lista delle attività
     })
 
@@ -500,7 +543,11 @@ def plant_details(id):
 @app.route('/plant/edit/<int:id>', methods=['POST'])
 def edit_plant(id):
     plant = Plant.query.get_or_404(id)
-    plant.name = request.form.get('name')
+    new_name = (request.form.get('name') or '').strip()
+    if not new_name:
+        flash("Il nome della pianta è obbligatorio! Modifica non salvata.", "error")
+        return redirect(url_for('list_plants'))
+    plant.name = new_name
     plant.species = request.form.get('species')
     plant.exposure = request.form.get('exposure')
     plant.watering = request.form.get('watering')
@@ -614,14 +661,18 @@ def add_task():
     due_date = request.form.get('due_date') or "Subito"
     is_urgent = 'is_urgent' in request.form
     
-    if not plant_id or plant_id == "":
-        plant_id = None
-    else:
+    if not title or not title.strip():
+        flash("Il titolo dell'attività è obbligatorio!", "error")
+        return redirect(url_for('dashboard'))
+
+    try:
         plant_id = int(plant_id)
+    except (TypeError, ValueError):
+        plant_id = None
 
     new_task = Task(
         plant_id=plant_id,
-        title=title,
+        title=title.strip(),
         description=description,
         due_date=due_date,
         is_urgent=is_urgent,
@@ -667,9 +718,14 @@ def diagnose_page():
             return redirect(url_for('diagnose_page'))
             
         # Determine actual plant name
-        selected_plant = None
         if plant_id and plant_id != "new":
-            selected_plant = Plant.query.get(int(plant_id))
+            try:
+                selected_plant = Plant.query.get(int(plant_id))
+            except (TypeError, ValueError):
+                selected_plant = None
+            if not selected_plant:
+                flash("La pianta selezionata non esiste più. Riprova.", "error")
+                return redirect(url_for('diagnose_page'))
             plant_name = selected_plant.name
             species = selected_plant.species or ""
         else:
@@ -678,6 +734,9 @@ def diagnose_page():
             
         # Save photo
         filename = secure_filename(image_file.filename)
+        # Fallback se secure_filename svuota il nome (es. caratteri non-ASCII)
+        if not filename:
+            filename = f"diagnosi_{int(datetime.now().timestamp())}.jpg"
         filename = f"diag_{int(datetime.now().timestamp())}_{filename}"
         image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         image_file.save(os.path.join(app.root_path, image_path))
@@ -712,16 +771,20 @@ def apply_diagnosis():
     watering_rules = request.form.get('watering_rules')
     
     # 1. Get or Create Plant
+    plant = None
     if plant_id and plant_id != "new":
-        plant = Plant.query.get(int(plant_id))
-        if plant:
-            # Update its details if empty or with new instructions
-            if image_url:
-                plant.image_url = image_url
-            if exposure_rules and (not plant.exposure or plant.exposure == ""):
-                plant.exposure = exposure_rules
-            if watering_rules and (not plant.watering or plant.watering == ""):
-                plant.watering = watering_rules
+        try:
+            plant = Plant.query.get(int(plant_id))
+        except (TypeError, ValueError):
+            plant = None
+    if plant:
+        # Update its details if empty or with new instructions
+        if image_url:
+            plant.image_url = image_url
+        if exposure_rules and (not plant.exposure or plant.exposure == ""):
+            plant.exposure = exposure_rules
+        if watering_rules and (not plant.watering or plant.watering == ""):
+            plant.watering = watering_rules
     else:
         # Create a brand new plant!
         plant = Plant(
@@ -757,7 +820,8 @@ def apply_diagnosis():
     db.session.add(new_task)
     db.session.commit()
     
-    flash(f"Diagnosi applicata! Creato un compito urgente per '{plant.name}' e aggiornato il database.", "success")
+    tipo_compito = "compito urgente" if is_urgent else "compito"
+    flash(f"Diagnosi applicata! Creato un {tipo_compito} per '{plant.name}' e aggiornato il database.", "success")
     return redirect(url_for('dashboard'))
 
 
@@ -784,15 +848,27 @@ def list_models():
 def settings():
     if request.method == 'POST':
         ai_provider = request.form.get('ai_provider', 'openai')
+        ai_model = request.form.get('ai_model', '').strip()
         openai_api_key = request.form.get('openai_api_key', '').strip()
         google_api_key = request.form.get('google_api_key', '').strip()
         openrouter_api_key = request.form.get('openrouter_api_key', '').strip()
         
+        # Sicurezza: accettiamo solo modelli presenti nel listino del provider scelto
+        valid_models = [m['id'] for m in AI_MODELS.get(ai_provider, [])]
+        if ai_model not in valid_models:
+            ai_model = valid_models[0] if valid_models else None
+        
         settings = get_app_settings()
         settings.ai_provider = ai_provider
-        settings.openai_api_key = openai_api_key
-        settings.google_api_key = google_api_key
-        settings.openrouter_api_key = openrouter_api_key
+        settings.ai_model = ai_model
+        # Le chiavi vengono aggiornate SOLO se compilate:
+        # un campo lasciato vuoto non cancella la chiave già salvata
+        if openai_api_key:
+            settings.openai_api_key = openai_api_key
+        if google_api_key:
+            settings.google_api_key = google_api_key
+        if openrouter_api_key:
+            settings.openrouter_api_key = openrouter_api_key
         db.session.commit()
         
         flash("Configurazione salvata con successo! L'IA scelta è ora attiva (se hai inserito una chiave valida).", "success")
@@ -800,11 +876,14 @@ def settings():
     
     settings = get_app_settings()
     current_provider = settings.ai_provider or 'openai'
+    current_model = get_selected_model(settings, current_provider)
     openai_key = settings.openai_api_key or os.environ.get('OPENAI_API_KEY') or ""
     google_key = settings.google_api_key or os.environ.get('GOOGLE_API_KEY') or ""
     openrouter_key = settings.openrouter_api_key or os.environ.get('OPENROUTER_API_KEY') or ""
     return render_template('settings.html', 
                            current_provider=current_provider, 
+                           current_model=current_model,
+                           ai_models=AI_MODELS,
                            openai_key=openai_key, 
                            google_key=google_key,
                            openrouter_key=openrouter_key)
@@ -813,6 +892,14 @@ def settings():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+        
+        # Migrazione leggera: aggiunge la colonna ai_model se non esiste ancora
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            columns = [row[1] for row in conn.execute(text("PRAGMA table_info(settings)"))]
+            if 'ai_model' not in columns:
+                conn.execute(text("ALTER TABLE settings ADD COLUMN ai_model VARCHAR(100)"))
+                conn.commit()
         
         # Populate with some default plants if db is empty
         if Plant.query.count() == 0:

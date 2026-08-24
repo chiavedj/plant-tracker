@@ -16,7 +16,20 @@
     </div>
 
     <!-- AI Mode Badge / Notice -->
-    {% if diagnosis.is_mock %}
+    {% if diagnosis.status == 'error' %}
+        <div class="bg-rose-50 border border-rose-200 text-rose-900 px-5 py-4 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+            <div class="flex items-start space-x-3">
+                <i class="fa-solid fa-circle-exclamation text-2xl text-rose-600 mt-0.5 flex-shrink-0"></i>
+                <div>
+                    <h4 class="font-bold text-sm">Errore durante l'analisi IA</h4>
+                    <p class="text-xs text-stone-600 mt-0.5">{{ diagnosis.message }}</p>
+                </div>
+            </div>
+            <a href="/settings" class="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-4.5 py-2.5 rounded-xl shadow-sm transition-all text-center flex-shrink-0">
+                Controlla Impostazioni
+            </a>
+        </div>
+    {% elif diagnosis.is_mock %}
         <div class="bg-amber-50 border border-amber-200 text-amber-900 px-5 py-4 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
             <div class="flex items-start space-x-3">
                 <i class="fa-solid fa-circle-info text-2xl text-amber-600 mt-0.5 flex-shrink-0"></i>

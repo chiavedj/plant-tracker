@@ -128,3 +128,6 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
+
+# User uploads (foto caricate dagli utenti)
+static/uploads/

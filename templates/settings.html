@@ -43,6 +43,37 @@
                 </div>
             </div>
 
+            <!-- Model Selection -->
+            <div id="model-section">
+                <label class="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-2">
+                    <i class="fa-solid fa-microchip mr-1"></i> Modello IA
+                </label>
+                <div class="grid gap-3" id="model-options">
+                    {% for provider, models in ai_models.items() %}
+                        {% for m in models %}
+                        <label data-provider="{{ provider }}" 
+                               class="model-card relative flex items-start space-x-3 p-4 rounded-xl border-2 cursor-pointer transition-all
+                               {% if current_model == m.id and current_provider == provider %} border-emerald-600 bg-emerald-50 {% else %} border-stone-200 hover:border-stone-300 {% endif %}
+                               {% if current_provider != provider %} hidden {% endif %}">
+                            <input type="radio" name="ai_model" value="{{ m.id }}" class="mt-0.5 accent-emerald-700"
+                                   {% if current_model == m.id and current_provider == provider %} checked {% endif %}>
+                            <div class="flex-1">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-bold text-sm text-stone-900"><i class="fa-solid {{ m.icon }} text-emerald-600 mr-1.5"></i>{{ m.name }}</span>
+                                    {% if loop.first %}<span class="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Consigliato</span>{% endif %}
+                                </div>
+                                <p class="text-xs text-stone-500 mt-0.5">{{ m.desc }}</p>
+                            </div>
+                        </label>
+                        {% endfor %}
+                    {% endfor %}
+                </div>
+                <p class="text-[11px] text-stone-500 mt-2 flex items-center space-x-1.5">
+                    <i class="fa-solid fa-lightbulb text-amber-400"></i>
+                    <span>I modelli "mini", "flash" e "nano" costano una frazione dei modelli premium e sono perfetti per la diagnosi delle piante.</span>
+                </p>
+            </div>
+
             <!-- OpenAI API Key -->
             <div id="openai-section" class="{% if current_provider != 'openai' %} opacity-50 pointer-events-none {% endif %} transition-opacity">
                 <label class="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-2">OpenAI API Key</label>
@@ -73,7 +104,7 @@
                 </div>
             </div>
 
-            <p class="text-[11px] text-stone-500 mt-1.5 leading-relaxed">Nota: Le chiavi vengono salvate nella sessione corrente del tuo browser o lette dalle variabili d'ambiente. Non vengono salvate in database pubblici.</p>
+            <p class="text-[11px] text-stone-500 mt-1.5 leading-relaxed">Nota: le chiavi vengono aggiornate solo se compili il campo — lasciandolo vuoto resta quella già salvata (o letta dalle variabili d'ambiente). Non vengono salvate in database pubblici.</p>
 
             <!-- Configuration info alert -->
             <div class="bg-emerald-50 border border-emerald-100 text-emerald-950 p-4.5 rounded-2xl flex items-start space-x-3 text-xs leading-relaxed">
@@ -134,6 +165,21 @@
         const openaiSection = document.getElementById('openai-section');
         const googleSection = document.getElementById('google-section');
         const labels = document.querySelectorAll('.grid.grid-cols-2.gap-4 > label');
+
+        // Mostra solo i modelli del provider selezionato
+        document.querySelectorAll('#model-options .model-card').forEach(card => {
+            const isForProvider = card.dataset.provider === selectedProvider;
+            card.classList.toggle('hidden', !isForProvider);
+            if (isForProvider) {
+                // Assicurati che almeno un modello del provider sia selezionato
+                const checked = card.querySelector('input[type=radio]:checked');
+                if (!checked && document.querySelector('#model-options input:checked') === null) {
+                    card.querySelector('input[type=radio]').checked = true;
+                    card.classList.add('border-emerald-600', 'bg-emerald-50');
+                }
+            }
+        });
+
         if (labels.length >= 2) {
             const openaiLabel = labels[0];
             const googleLabel = labels[1];
@@ -155,9 +201,27 @@
         }
     }
 
+    // Evidenzia la scheda modello quando viene selezionata
+    function updateModelCardsUI() {
+        document.querySelectorAll('#model-options .model-card').forEach(card => {
+            const radio = card.querySelector('input[type=radio]');
+            if (radio.checked) {
+                card.classList.add('border-emerald-600', 'bg-emerald-50');
+                card.classList.remove('border-stone-200', 'hover:border-stone-300');
+            } else {
+                card.classList.remove('border-emerald-600', 'bg-emerald-50');
+                card.classList.add('border-stone-200', 'hover:border-stone-300');
+            }
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', updateProviderUI);
+    document.addEventListener('DOMContentLoaded', updateModelCardsUI);
     document.querySelectorAll('input[name="ai_provider"]').forEach(radio => {
         radio.addEventListener('change', updateProviderUI);
+    });
+    document.querySelectorAll('input[name="ai_model"]').forEach(radio => {
+        radio.addEventListener('change', updateModelCardsUI);
     });
 </script>
 {% endblock %}
