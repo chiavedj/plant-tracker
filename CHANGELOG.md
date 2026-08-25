@@ -5,6 +5,17 @@ Tutte le modifiche importanti a questo progetto vengono documentate in questo fi
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/it/1.1.0/)
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.1.2] – 2025-08-24
+
+### Aggiunto
+- Modelli **Gemma gratuiti** nel listino Google: Gemma 3 27B e Gemma 3 12B
+
+### Corretto
+- **Wishlist lentissima**: l'IA veniva chiamata ad ogni apertura pagina. Ora:
+  - timeout di 20 secondi sulle chiamate IA (mai più pagine in caricamento infinito)
+  - cache dei suggerimenti stagionali per 6 ore (prima apertura lenta, poi istantanea)
+  - stesso trattamento per il consiglio d'acquisto aggiunto alla wishlist
+
 ## [1.1.1] – 2025-08-24
 
 ### Aggiunto

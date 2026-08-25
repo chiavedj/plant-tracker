@@ -6,9 +6,11 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 import json
+import threading
+import time
 import google.generativeai as genai
 
-__version__ = "1.1.1"  # Fonte unica della versione (vedi CHANGELOG.md)
+__version__ = "1.1.2"  # Fonte unica della versione (vedi CHANGELOG.md)
 
 app = Flask(__name__)
 app.secret_key = "plant_tracker_super_secret_key"
@@ -73,6 +75,8 @@ AI_MODELS = {
         {'id': 'models/gemini-3.6-flash', 'name': 'Gemini 3.6 Flash', 'desc': 'Veloce ed economico (consigliato)', 'icon': 'fa-feather'},
         {'id': 'models/gemini-2.5-flash', 'name': 'Gemini 2.5 Flash', 'desc': 'Più intelligente, costo moderato', 'icon': 'fa-scale-balanced'},
         {'id': 'models/gemini-flash-latest', 'name': 'Gemini Flash Latest', 'desc': 'Ultima versione flash disponibile', 'icon': 'fa-wand-magic-sparkles'},
+        {'id': 'models/gemma-3-27b-it', 'name': 'Gemma 3 27B', 'desc': 'GRATUITO — qualità elevata', 'icon': 'fa-gift'},
+        {'id': 'models/gemma-3-12b-it', 'name': 'Gemma 3 12B', 'desc': 'GRATUITO — leggero e veloce', 'icon': 'fa-gift'},
     ]
 }
 
@@ -116,6 +120,31 @@ def clean_ai_json(text):
     if start != -1 and end > start:
         return text[start:end+1]
     return text
+
+# Timeout per le chiamate IA: se l'API non risponde entro N secondi si usa il
+# fallback, così le pagine non restano MAI in caricamento all'infinito
+AI_CALL_TIMEOUT_SECONDS = 20
+
+# Cache dei suggerimenti stagionali della wishlist (evita di chiamare l'IA
+# ad ogni apertura pagina). Scade dopo 6 ore.
+_SUGGESTIONS_CACHE = {}
+_SUGGESTIONS_CACHE_TTL = 60 * 60 * 6
+
+def run_with_timeout(func, timeout_seconds=AI_CALL_TIMEOUT_SECONDS):
+    """Esegue func() in un thread separato. Restituisce None su timeout o errore."""
+    result = {}
+    def _target():
+        try:
+            result['value'] = func()
+        except Exception:
+            pass
+    t = threading.Thread(target=_target, daemon=True)
+    t.start()
+    t.join(timeout_seconds)
+    if t.is_alive():
+        print(f"Chiamata IA interrotta dopo {timeout_seconds}s di attesa")
+        return None
+    return result.get('value')
 
 # Context processor to expose current season and month
 @app.context_processor
@@ -342,24 +371,28 @@ def get_best_purchase_time(plant_name, species=""):
         Rispondi in modo conciso (massimo 3 frasi).
         """
         
-        if ai_provider == 'openai':
-            import openai
-            client = openai.OpenAI(api_key=api_key)
-            response = client.chat.completions.create(
-                model=get_selected_model(settings, 'openai'),
-                messages=[{"role": "user", "content": prompt}]
-            )
-            return response.choices[0].message.content.strip()
+        def _ask():
+            if ai_provider == 'openai':
+                import openai
+                client = openai.OpenAI(api_key=api_key)
+                response = client.chat.completions.create(
+                    model=get_selected_model(settings, 'openai'),
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                return response.choices[0].message.content.strip()
+            else: # Google Gemini / Gemma
+                genai.configure(api_key=api_key)
+                model = genai.GenerativeModel(get_selected_model(settings, 'google'))
+                response = model.generate_content(prompt)
+                return response.text.strip()
         
-        else: # Google Gemini / Gemma
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel(get_selected_model(settings, 'google'))
-            response = model.generate_content(prompt)
-            return response.text.strip()
+        answer = run_with_timeout(_ask)
+        if answer:
+            return answer.strip()
             
     except Exception as e:
         print(f"Errore get_best_purchase_time: {str(e)}")
-        return "Consiglio: Acquista in primavera o inizio estate per garantire una crescita vigorosa."
+    return "Consiglio: Acquista in primavera o inizio estate per garantire una crescita vigorosa."
 
 def get_seasonal_suggestions():
     settings = get_app_settings()
@@ -385,10 +418,16 @@ def get_seasonal_suggestions():
     else:  # openrouter
         api_key = settings.openrouter_api_key or os.environ.get('OPENROUTER_API_KEY')
     
+    # Cache: se i suggerimenti per questa stagione sono freschi (< 6 ore),
+    # restituiscili subito senza chiamare l'IA → wishlist sempre rapida
+    cached = _SUGGESTIONS_CACHE.get(season)
+    if cached and (time.time() - cached[0]) < _SUGGESTIONS_CACHE_TTL:
+        return cached[1]
+
     if not api_key:
         return default_suggestions
 
-    try:
+    def _fetch():
         prompt = f"""
         Sei un esperto botanico. Siamo in {season}. Suggerisci 3 piante diverse che sia l'ideale acquistare e trapiantare in questo periodo.
         Per ogni pianta fornisci:
@@ -413,20 +452,21 @@ def get_seasonal_suggestions():
                 response_format={"type": "json_object"}
             )
             data = json.loads(response.choices[0].message.content)
-            suggestions = data.get("suggestions", [])
-            return suggestions if suggestions else default_suggestions
-        
-        else: # Google Gemini
+        else: # Google Gemini / Gemma
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel(get_selected_model(settings, 'google'))
             response = model.generate_content(prompt)
             data = json.loads(clean_ai_json(response.text))
-            suggestions = data.get("suggestions", [])
-            return suggestions if suggestions else default_suggestions
-            
-    except Exception as e:
-        print(f"Errore get_seasonal_suggestions: {str(e)}")
-        return default_suggestions
+        
+        suggestions = data.get("suggestions", [])
+        return suggestions if suggestions else None
+    
+    suggestions = run_with_timeout(_fetch)
+    if isinstance(suggestions, list) and suggestions:
+        _SUGGESTIONS_CACHE[season] = (time.time(), suggestions)
+        return suggestions
+    
+    return default_suggestions
 
 
 # --- ROUTES ---
