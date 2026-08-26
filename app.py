@@ -139,19 +139,29 @@ CHAT_TIMEOUT_SECONDS = 180  # La chat può aspettare di più: modelli grandi com
 _SUGGESTIONS_CACHE = {}
 _SUGGESTIONS_CACHE_TTL = 60 * 60 * 6
 
-def run_with_timeout(func, timeout_seconds=AI_CALL_TIMEOUT_SECONDS):
-    """Esegue func() in un thread separato. Restituisce None su timeout o errore."""
+def run_with_timeout(func, timeout_seconds=AI_CALL_TIMEOUT_SECONDS, raise_on_error=False):
+    """Esegue func() in un thread separato.
+    - Timeout scaduto -> restituisce None
+    - Eccezione interna -> restituisce None (e logga), OPPURE rilancia se raise_on_error=True
+    """
     result = {}
     def _target():
         try:
             result['value'] = func()
-        except Exception:
-            pass
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            result['error'] = e
     t = threading.Thread(target=_target, daemon=True)
     t.start()
     t.join(timeout_seconds)
     if t.is_alive():
         print(f"Chiamata IA interrotta dopo {timeout_seconds}s di attesa")
+        return None
+    if 'error' in result:
+        if raise_on_error:
+            raise result['error']
+        print(f"Errore chiamata IA: {result['error']}")
         return None
     return result.get('value')
 
@@ -1217,27 +1227,47 @@ def chatbot_send():
     system_prompt = CHAT_SYSTEM_PROMPT + _plants_context()
     recent = history[-12:]
     
-    def _ask():
-        if (settings.ai_provider or 'openai') == 'openai':
+    recent = history[-12:]
+    provider = settings.ai_provider or 'openai'
+    
+    def _ask(model_override=None):
+        model_id = model_override or get_selected_model(settings, provider)
+        if provider == 'openai':
             import openai
             client = openai.OpenAI(api_key=api_key)
             resp = client.chat.completions.create(
-                model=get_selected_model(settings, 'openai'),
+                model=model_id,
                 messages=[{'role': 'system', 'content': system_prompt}] + recent
             )
             return resp.choices[0].message.content.strip()
         else:
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel(get_selected_model(settings, 'google'))
+            model = genai.GenerativeModel(model_id)
             contents = [{'role': ('model' if h['role'] == 'assistant' else 'user'), 'parts': [h['content']]} for h in recent]
             response = model.generate_content(contents)
             return response.text.strip()
     
-    reply = run_with_timeout(_ask, timeout_seconds=CHAT_TIMEOUT_SECONDS)
-    if not reply:
-        reply = ('⏱️ Non sono riuscito a rispondere entro 3 minuti. Il modello selezionato potrebbe essere '
-                 'molto lento in questo momento. Riprova — oppure nelle Impostazioni scegli un modello '
-                 'più rapido (i Gemini Flash rispondono in pochi secondi).')
+    try:
+        reply = run_with_timeout(lambda: _ask(), timeout_seconds=CHAT_TIMEOUT_SECONDS, raise_on_error=True)
+        if not reply:
+            reply = ('⏱️ Non sono riuscito a rispondere entro 3 minuti. Il modello selezionato potrebbe essere '
+                     'molto lento in questo momento. Riprova — oppure nelle Impostazioni scegli un modello '
+                     'più rapido (i Gemini Flash rispondono in pochi secondi).')
+    except Exception as e:
+        err = str(e)
+        chosen = get_selected_model(settings, provider)
+        print(f"Chatbot errore con modello {chosen}: {err}")
+        # Se il modello scelto non esiste o non è supportato dalla chiave/API,
+        # riprova automaticamente con il modello consigliato del provider
+        if any(k in err.lower() for k in ['not found', '404', 'is not supported', 'unsupported', 'not available']):
+            fb = AI_MODELS.get(provider, [{}])[0]
+            try:
+                reply = run_with_timeout(lambda: _ask(fb['id']), timeout_seconds=CHAT_TIMEOUT_SECONDS, raise_on_error=True)
+                reply += f"\n\n_(Risposto automaticamente con {fb['name']} perché il modello selezionato non è disponibile.)_"
+            except Exception as e2:
+                reply = f"❌ Il modello selezionato non è disponibile ({err[:150]}) e anche il fallback ha fallito ({str(e2)[:150]})."
+        else:
+            reply = f"❌ Errore dall'IA: {err[:300]}\n\nProva a scegliere un altro modello nelle Impostazioni (vedi anche /list_models per i modelli disponibili sulla tua chiave Google)."
     
     history.append({'role': 'assistant', 'content': reply})
     session['chat_history'] = history[-14:]

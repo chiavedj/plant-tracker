@@ -1,5 +1,15 @@
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.5.0] – 2025-08-26
+
+### Corretto
+- **Chatbot: falsi "timeout" eliminati** — gli errori reali dell'API venivano nascosti e mascherati da "Non sono riuscito a rispondere entro 3 minuti" anche quando fallivano subito. Ora:
+  - gli errori vengono mostrati chiaramente in chat (es. modello non trovato)
+  - se il modello selezionato non è disponibile, **riprova automaticamente** con quello consigliato del provider e lo segnala nel messaggio
+  - l'errore completo viene loggato nei container log per il debug
+
+
+
 ## [1.4.0] – 2025-08-26
 
 ### Aggiunto
