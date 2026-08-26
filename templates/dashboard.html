@@ -107,13 +107,28 @@
 
     <!-- 1. CRITICAL / URGENT TASKS (HIGHLIGHTED AT THE TOP) -->
     <div class="space-y-4">
-        <div class="flex items-center space-x-3">
-            <div class="bg-rose-500 h-3 w-3 rounded-full animate-pulse"></div>
-            <h2 class="text-2xl font-bold text-stone-900">In Evidenza: Da Fare Assolutamente</h2>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center space-x-3">
+                <div class="bg-rose-500 h-3 w-3 rounded-full animate-pulse"></div>
+                <h2 class="text-2xl font-bold text-stone-900">In Evidenza: Da Fare Assolutamente</h2>
+            </div>
+            {% if urgent_tasks %}
+            <div id="urgent-view-toggle" class="flex items-center bg-white rounded-xl border border-stone-200 shadow-sm p-1 text-xs font-semibold">
+                <button type="button" data-view="grouped" onclick="setUrgentView('grouped')"
+                        class="px-3 py-1.5 rounded-lg transition-all flex items-center space-x-1.5">
+                    <i class="fa-solid fa-layer-group"></i><span>Raggruppa per pianta</span>
+                </button>
+                <button type="button" data-view="list" onclick="setUrgentView('list')"
+                        class="px-3 py-1.5 rounded-lg transition-all flex items-center space-x-1.5">
+                    <i class="fa-solid fa-list"></i><span>Elenca</span>
+                </button>
+            </div>
+            {% endif %}
         </div>
 
         {% if urgent_tasks %}
-            <div class="grid grid-cols-1 gap-4">
+            <!-- VISTA ELENCO (tutte le card insieme, come sempre) -->
+            <div id="urgent-list-view" class="grid grid-cols-1 gap-4">
                 {% for task in urgent_tasks %}
                     <div class="bg-rose-50 border-2 border-rose-200 rounded-3xl p-6 shadow-md transition-all hover:border-rose-300 flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div class="flex items-start space-x-4">
@@ -143,6 +158,59 @@
                             <a href="/task/delete/{{ task.id }}" class="text-stone-400 hover:text-rose-600 p-3 rounded-xl transition-colors" title="Elimina compito">
                                 <i class="fa-solid fa-trash-can"></i>
                             </a>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <!-- VISTA RAGGRUPPATA PER PIANTA -->
+            <div id="urgent-grouped-view" class="space-y-3">
+                {% for group in urgent_groups %}
+                    <div class="bg-white border-2 border-rose-100 hover:border-rose-200 rounded-3xl shadow-sm transition-all overflow-hidden">
+                        <button type="button" onclick="toggleUrgentGroup('ug-{{ loop.index }}', this)"
+                                class="w-full flex items-center justify-between gap-4 p-5 text-left">
+                            <div class="flex items-center space-x-3 min-w-0">
+                                <div class="bg-rose-100 text-rose-600 p-2.5 rounded-xl flex-shrink-0">
+                                    <i class="fa-solid fa-seedling"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <h3 class="font-bold text-stone-900 truncate">{{ group.name }}</h3>
+                                    <p class="text-xs text-stone-500">{{ group.count }} compit{{ 'o' if group.count == 1 else 'i' }} da fare assolutamente</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2 flex-shrink-0">
+                                {% if group.has_watering %}
+                                    <span class="text-sky-700 text-[10px] font-bold uppercase bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full">💧 Auto</span>
+                                {% endif %}
+                                <span class="bg-rose-600 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full">{{ group.count }}</span>
+                                <i class="fa-solid fa-chevron-down text-rose-300 transition-transform duration-200"></i>
+                            </div>
+                        </button>
+                        <div id="ug-{{ loop.index }}" class="hidden border-t border-stone-100 divide-y divide-stone-100 bg-stone-50/40">
+                            {% for task in group.tasks %}
+                                <div class="px-5 py-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <div class="flex items-center space-x-2 flex-wrap">
+                                            <h4 class="font-bold text-sm text-stone-900">{{ task.title }}</h4>
+                                            {% if task.is_urgent and not loop.first %}
+                                                <span class="bg-rose-100 text-rose-700 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md">Urgente</span>
+                                            {% endif %}
+                                        </div>
+                                        {% if task.description %}
+                                            <p class="text-xs text-stone-500 mt-1 leading-relaxed line-clamp-2 whitespace-pre-line">{{ task.description }}</p>
+                                        {% endif %}
+                                        <span class="inline-block mt-1.5 text-[10px] text-rose-700 font-bold bg-rose-50 px-2 py-0.5 rounded-lg">⏰ {{ task.due_date }}</span>
+                                    </div>
+                                    <div class="flex items-center space-x-2 justify-end md:flex-shrink-0">
+                                        <a href="/task/complete/{{ task.id }}" class="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-sm transition-all flex items-center space-x-1.5">
+                                            <i class="fa-solid fa-check"></i><span>Fatto</span>
+                                        </a>
+                                        <a href="/task/delete/{{ task.id }}" class="text-stone-400 hover:text-rose-600 p-2 rounded-lg transition-colors" title="Elimina compito">
+                                            <i class="fa-solid fa-trash-can text-sm"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                            {% endfor %}
                         </div>
                     </div>
                 {% endfor %}
@@ -336,4 +404,35 @@
         </form>
     </div>
 </div>
+<script>
+    // Vista urgente: raggruppata per pianta oppure elenco completo
+    function setUrgentView(mode, persist = true) {
+        const listView = document.getElementById('urgent-list-view');
+        const groupedView = document.getElementById('urgent-grouped-view');
+        if (!listView || !groupedView) return;
+        listView.classList.toggle('hidden', mode === 'grouped');
+        groupedView.classList.toggle('hidden', mode !== 'grouped');
+        document.querySelectorAll('#urgent-view-toggle button').forEach(btn => {
+            const active = btn.dataset.view === mode;
+            btn.classList.toggle('bg-emerald-700', active);
+            btn.classList.toggle('text-white', active);
+            btn.classList.toggle('shadow', active);
+            btn.classList.toggle('text-stone-500', !active);
+        });
+        if (persist) localStorage.setItem('florae_urgent_view', mode);
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+        if (document.getElementById('urgent-view-toggle')) {
+            setUrgentView(localStorage.getItem('florae_urgent_view') || 'grouped', false);
+        }
+    });
+
+    // Apri/chiudi un gruppo di compiti per pianta
+    function toggleUrgentGroup(groupId, btn) {
+        const body = document.getElementById(groupId);
+        body.classList.toggle('hidden');
+        const chevron = btn.querySelector('.fa-chevron-down');
+        chevron.style.transform = body.classList.contains('hidden') ? '' : 'rotate(180deg)';
+    }
+</script>
 {% endblock %}
