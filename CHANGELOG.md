@@ -1,5 +1,13 @@
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.5.1] – 2025-08-26
+
+### Corretto
+- **Chatbot (Google/Gemma): il contesto delle piante non veniva inviato** — il bot diceva "non conosco le tue piante". Ora istruzioni + elenco piante reali vengono iniettati nel primo turno della conversazione
+- **Gemma mostrava il ragionamento interno** (opzioni, appunti in inglese) invece della sola risposta: aggiunte istruzioni esplicite anti-rivelazione nel prompt di sistema
+
+
+
 ## [1.5.0] – 2025-08-26
 
 ### Corretto

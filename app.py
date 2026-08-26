@@ -1192,7 +1192,10 @@ CHAT_SYSTEM_PROMPT = (
     "Sei Florae Bot, un esperto agronomo e botanico virtuale dentro l'app Florae di gestione piante. "
     "Rispondi SEMPRE in italiano, in modo pratico e conciso (max 150 parole salvo richiesta diversa). "
     "Usa elenchi puntati per i consigli operativi. Se la domanda riguarda una pianta dell'utente, "
-    "basa la risposta sui suoi dati reali qui sotto.\n\n"
+    "basa la risposta sui suoi dati reali qui sotto.\n"
+    "IMPORTANTISSIMO: mostra SOLO la risposta finale all'utente. Non scrivere MAI il tuo ragionamento "
+    "interno, le opzioni che stai valutando, appunti in inglese o testo prima/dopo la risposta. "
+    "Nessun preambolo tipo 'Ecco la risposta'. Solo la risposta pulita.\n\n"
 )
 
 def _plants_context():
@@ -1244,6 +1247,13 @@ def chatbot_send():
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel(model_id)
             contents = [{'role': ('model' if h['role'] == 'assistant' else 'user'), 'parts': [h['content']]} for h in recent]
+            # I modelli Gemma non supportano system_instruction: iniettiamo il
+            # contesto (istruzioni + piante reali dell'utente) nel primo turno utente
+            ctx = f"{system_prompt}\n---\nDomanda dell'utente: "
+            if contents and contents[0]['role'] == 'user':
+                contents[0]['parts'][0] = ctx + str(contents[0]['parts'][0])
+            else:
+                contents.insert(0, {'role': 'user', 'parts': [ctx + '(saluta e chiedi come puoi aiutare)']})
             response = model.generate_content(contents)
             return response.text.strip()
     
