@@ -11,7 +11,7 @@ import time
 import requests
 import google.generativeai as genai
 
-__version__ = "1.3.1"  # Fonte unica della versione (vedi CHANGELOG.md)
+__version__ = "1.4.0"  # Fonte unica della versione (vedi CHANGELOG.md)
 
 app = Flask(__name__)
 app.secret_key = "plant_tracker_super_secret_key"
@@ -79,7 +79,8 @@ AI_MODELS = {
         {'id': 'models/gemini-3.6-flash', 'name': 'Gemini 3.6 Flash', 'desc': 'Veloce ed economico (consigliato)', 'icon': 'fa-feather'},
         {'id': 'models/gemini-2.5-flash', 'name': 'Gemini 2.5 Flash', 'desc': 'Più intelligente, costo moderato', 'icon': 'fa-scale-balanced'},
         {'id': 'models/gemini-flash-latest', 'name': 'Gemini Flash Latest', 'desc': 'Ultima versione flash disponibile', 'icon': 'fa-wand-magic-sparkles'},
-        {'id': 'models/gemma-3-27b-it', 'name': 'Gemma 3 27B', 'desc': 'GRATUITO — qualità elevata', 'icon': 'fa-gift'},
+        {'id': 'models/gemma-4-31b-it', 'name': 'Gemma 4 31B', 'desc': 'GRATUITO — il più potente, risposta lenta', 'icon': 'fa-gift'},
+        {'id': 'models/gemma-3-27b-it', 'name': 'Gemma 3 27B', 'desc': 'GRATUITO — qualità elevata, lento', 'icon': 'fa-gift'},
         {'id': 'models/gemma-3-12b-it', 'name': 'Gemma 3 12B', 'desc': 'GRATUITO — leggero e veloce', 'icon': 'fa-gift'},
     ]
 }
@@ -131,6 +132,7 @@ def clean_ai_json(text):
 # Timeout per le chiamate IA: se l'API non risponde entro N secondi si usa il
 # fallback, così le pagine non restano MAI in caricamento all'infinito
 AI_CALL_TIMEOUT_SECONDS = 20
+CHAT_TIMEOUT_SECONDS = 180  # La chat può aspettare di più: modelli grandi come Gemma 27B sono lenti ma completi
 
 # Cache dei suggerimenti stagionali della wishlist (evita di chiamare l'IA
 # ad ogni apertura pagina). Scade dopo 6 ore.
@@ -1231,9 +1233,11 @@ def chatbot_send():
             response = model.generate_content(contents)
             return response.text.strip()
     
-    reply = run_with_timeout(_ask, timeout_seconds=45)
+    reply = run_with_timeout(_ask, timeout_seconds=CHAT_TIMEOUT_SECONDS)
     if not reply:
-        reply = '⏱️ Non sono riuscito a rispondere in tempo. Riprova tra poco o scegli un modello più veloce nelle Impostazioni.'
+        reply = ('⏱️ Non sono riuscito a rispondere entro 3 minuti. Il modello selezionato potrebbe essere '
+                 'molto lento in questo momento. Riprova — oppure nelle Impostazioni scegli un modello '
+                 'più rapido (i Gemini Flash rispondono in pochi secondi).')
     
     history.append({'role': 'assistant', 'content': reply})
     session['chat_history'] = history[-14:]

@@ -50,7 +50,7 @@
             {% endif %}
             <div id="typing-indicator" class="hidden flex justify-start">
                 <div class="bg-stone-100 border border-stone-200/70 rounded-2xl rounded-bl-md px-4 py-3 text-stone-400 text-sm">
-                    <i class="fa-solid fa-circle-notch fa-spin mr-2"></i>Florae Bot sta pensando...
+                    <i class="fa-solid fa-circle-notch fa-spin mr-2"></i><span id="typing-text">Florae Bot sta pensando...</span>
                 </div>
             </div>
         </div>
@@ -92,14 +92,34 @@
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
+    let typingTimer = null;
+
+    function startTypingIndicator() {
+        const start = Date.now();
+        const el = document.getElementById('typing-text');
+        clearInterval(typingTimer);
+        typingTimer = setInterval(() => {
+            const secs = Math.round((Date.now() - start) / 1000);
+            if (secs < 5) { el.textContent = 'Florae Bot sta pensando...'; }
+            else { el.textContent = `Sto elaborando la risposta (${secs}s)... i modelli gratuiti come Gemma possono richiedere qualche minuto`; }
+        }, 1000);
+        typing.classList.remove('hidden');
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    function stopTypingIndicator() {
+        clearInterval(typingTimer);
+        typing.classList.add('hidden');
+    }
+
     function send() {
         const text = input.value.trim();
         if (!text || sendBtn.disabled) return;
         input.value = '';
         sendBtn.disabled = true;
+        input.placeholder = 'Attendi la risposta prima di inviare...';
         addMessage('user', text);
-        typing.classList.remove('hidden');
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        startTypingIndicator();
 
         fetch('/chatbot/send', {
             method: 'POST',
@@ -109,7 +129,7 @@
         .then(r => r.json())
         .then(d => addMessage('assistant', d.reply))
         .catch(() => addMessage('assistant', '⚠️ Errore di connessione. Riprova.'))
-        .finally(() => { sendBtn.disabled = false; input.focus(); });
+        .finally(() => { stopTypingIndicator(); sendBtn.disabled = false; input.placeholder = 'Scrivi la tua domanda...'; input.focus(); });
     }
 
     sendBtn.addEventListener('click', send);

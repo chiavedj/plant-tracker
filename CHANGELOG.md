@@ -1,9 +1,15 @@
-# Changelog
-
-Tutte le modifiche importanti a questo progetto vengono documentate in questo file.
-
-Il formato è basato su [Keep a Changelog](https://keepachangelog.com/it/1.1.0/)
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
+
+## [1.4.0] – 2025-08-26
+
+### Aggiunto
+- **Gemma 4 31B** (gratuito) nel listino Google — il modello gratuito più potente
+- Indicatore di attesa in chat con secondi trascorsi e suggerimenti sui modelli gratuiti
+
+### Modificato
+- **Timeout della chat portato da 45s a 180s**: i modelli gratuiti grandi (Gemma 3 27B / Gemma 4 31B) possono richiedere qualche minuto — ora il bot aspetta la risposta invece di arrendersi
+
+
 
 ## [1.3.1] – 2025-08-26
 
