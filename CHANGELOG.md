@@ -5,6 +5,15 @@ Tutte le modifiche importanti a questo progetto vengono documentate in questo fi
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/it/1.1.0/)
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.3.1] – 2025-08-26
+
+### Corretto
+- La costante `__version__` non era stata aggiornata nel rilascio precedente (segnalava ancora 1.3.0)
+- Nota: la release 1.2.1 (vista urgente raggruppabile) è stata pubblicata dopo la 1.3.0 con numerazione errata — **il codice più recente è quello con numero più alto da qui in avanti**
+
+### Aggiunto
+- Vista urgente raggruppabile per pianta (introdotta nella 1.2.1, inclusa qui per chiarezza di versione)
+
 ## [1.3.0] – 2025-08-26
 
 ### Aggiunto
