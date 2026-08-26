@@ -1,6 +1,6 @@
 # 🌿 Florae - Plant Care Tracker & AI Diagnosis
 
-![Version](https://img.shields.io/badge/version-1.4.0-emerald) ![Python](https://img.shields.io/badge/python-3.9%2B-blue) ![Flask](https://img.shields.io/badge/flask-3.0-grey) ![License](https://img.shields.io/badge/license-MIT-green) ![Docker](https://img.shields.io/badge/docker-ghcr.io-2496ED)
+![Version](https://img.shields.io/badge/version-1.5.2-emerald) ![Python](https://img.shields.io/badge/python-3.9%2B-blue) ![Flask](https://img.shields.io/badge/flask-3.0-grey) ![License](https://img.shields.io/badge/license-MIT-green) ![Docker](https://img.shields.io/badge/docker-ghcr.io-2496ED)
 
 ![Florae Screenshot](flore.png)
 

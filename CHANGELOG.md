@@ -1,5 +1,18 @@
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.5.2] – 2025-08-26
+
+### Corretto
+- **Gemma mostrava tutto il ragionamento interno** (persona, opzioni valutate, drafting, word count) prima della risposta vera. Ora la chat applica una pulizia automatica che:
+  - taglia i blocchi di ragionamento e gli appunti interni del modello
+  - individua la risposta finale anche quando Gemma la ripete più volte (deduplicazione dei blocchi simili)
+  - non altera in alcun modo le risposte normali già pulite
+
+### Nota
+- Le release 1.5.0/1.5.1 contenevano già queste correzioni di codice ma con costante di versione errata (1.4.0)
+
+
+
 ## [1.5.1] – 2025-08-26
 
 ### Corretto

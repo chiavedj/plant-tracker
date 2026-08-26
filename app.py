@@ -11,7 +11,7 @@ import time
 import requests
 import google.generativeai as genai
 
-__version__ = "1.4.0"  # Fonte unica della versione (vedi CHANGELOG.md)
+__version__ = "1.5.2"  # Fonte unica della versione (vedi CHANGELOG.md)
 
 app = Flask(__name__)
 app.secret_key = "plant_tracker_super_secret_key"
@@ -289,6 +289,70 @@ def send_telegram(message):
     threading.Thread(target=_send, daemon=True).start()
     return True
 
+# --- PULIZIA RISPOSTE CHAT (modelli come Gemma "pensano ad alta voce") ---
+
+# Marker dopo cui inizia tipicamente la risposta vera di Gemma
+_FINAL_ANSWER_MARKERS = [
+    '*Final Polish:*', '**Final Polish:**', 'Final Polish:',
+    '*Final Answer:*', 'Final Answer:', '**Final answer:**',
+    '*Risposta finale:*', 'Risposta finale:',
+]
+
+# Pattern di righe che sono chiaramente appunti interni del modello, non risposta
+_INTERNAL_NOTE_PATTERNS = [
+    r'^\s*\**\s*(User Persona|Goal|Constraint|Input|Strict Output|Output Rule|Format|Language|Style)\b.*',
+    r'^\s*-\s*\**\s*(User Persona|Goal|Constraint|Input|Strict Output|Output Rule|Format|Language|Style)\b.*',
+    r'\*\s*\**(Option \d|Drafting|Final Polish|Final answer check|Word count)',
+    r'^\s*\**\s*(Italian|Concise|Bullet points|Based on data|No preamble|Specific|Greeting)\?\s*(Yes|No)?.*$',
+    r'^\s*\*\s*(High Water Needs|Moderate|Low Water|Specific Needs|Category \d|Instruction):.*$',
+    r'^\s*-\s*\**(High Water Needs|Moderate|Low Water|Specific Needs|Category \d|Instruction):.*$',
+]
+
+def _dedup_similar_blocks(t, threshold=0.7):
+    """Se il modello ripete la stessa risposta più volte (comune in Gemma),
+    tiene una sola copia di ciascun blocco di testo simile."""
+    import difflib
+    blocks = [b.strip() for b in t.split('\n\n') if b.strip()]
+    kept = []
+    for b in blocks:
+        dup = False
+        for i, k in enumerate(kept):
+            if difflib.SequenceMatcher(None, k.lower(), b.lower()).ratio() > threshold:
+                if len(b) > len(k):
+                    kept[i] = b  # tieni la versione più completa
+                dup = True
+                break
+        if not dup:
+            kept.append(b)
+    return '\n\n'.join(kept)
+
+def clean_chat_reply(text):
+    """Rimuove il ragionamento interno leakato dai modelli (es. Gemma),
+    tenendo solo la risposta finale."""
+    t = (text or '').strip()
+    if not t:
+        return t
+    # 1) Rimuovi note tipo "(Word count: ~80 words. Perfect.)"
+    t = re.sub(r'\((?:Word count|word count)[^\)]*\)\s*', '', t)
+    # 2) Se c'è un marker di risposta finale, tieni solo ciò che segue l'ULTIMO
+    best_start = None
+    for marker in _FINAL_ANSWER_MARKERS:
+        idx = t.rfind(marker)
+        if idx != -1:
+            nl = t.find('\n', idx)
+            start = (nl + 1) if nl != -1 else None
+            best_start = start if start else best_start
+    if best_start is not None:
+        candidate = t[best_start:].strip()
+        if len(candidate) > 30:  # evita di buttare tutto per un falso positivo
+            t = candidate
+    # 3) Filtra le righe-appunto residue
+    kept = [ln for ln in t.split('\n') if not any(re.search(p, ln, re.IGNORECASE) for p in _INTERNAL_NOTE_PATTERNS)]
+    cleaned = '\n'.join(kept).strip()
+    # 4) Rimuovi blocchi duplicati/simili (Gemma spesso ripete la risposta)
+    cleaned = _dedup_similar_blocks(cleaned)
+    # 5) Sicurezza: se la pulizia ha rimosso TUTTO, torna l'originale
+    return cleaned if cleaned else (text or '').strip()
 # Context processor to expose current season and month
 @app.context_processor
 def utility_processor():
@@ -1278,6 +1342,9 @@ def chatbot_send():
                 reply = f"❌ Il modello selezionato non è disponibile ({err[:150]}) e anche il fallback ha fallito ({str(e2)[:150]})."
         else:
             reply = f"❌ Errore dall'IA: {err[:300]}\n\nProva a scegliere un altro modello nelle Impostazioni (vedi anche /list_models per i modelli disponibili sulla tua chiave Google)."
+    
+    # Pulisce l'eventuale ragionamento interno leakato dal modello (es. Gemma)
+    reply = clean_chat_reply(reply)
     
     history.append({'role': 'assistant', 'content': reply})
     session['chat_history'] = history[-14:]
