@@ -58,6 +58,53 @@
     </div>
 
 
+    <!-- Weather Card -->
+    {% if weather %}
+        {% if weather.error %}
+            <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-4 text-sm flex items-center space-x-2">
+                <i class="fa-solid fa-triangle-exclamation"></i><span>{{ weather.error }} — controlla il nome in Impostazioni.</span>
+            </div>
+        {% else %}
+            <div class="bg-white rounded-3xl border border-stone-200/80 shadow-md p-6">
+                <div class="flex flex-col md:flex-row md:items-center gap-6">
+                    <!-- Current temp -->
+                    <div class="flex items-center space-x-4 flex-shrink-0">
+                        <i class="fa-solid {{ weather.days[0].icon if weather.days else 'fa-cloud-sun' }} text-4xl text-emerald-600"></i>
+                        <div>
+                            <div class="text-xs text-stone-400 font-bold uppercase tracking-wider">Meteo · {{ weather.city }}</div>
+                            <div class="text-3xl font-extrabold text-stone-900">{{ weather.temp|round|int }}°C</div>
+                        </div>
+                    </div>
+                    <!-- Alerts -->
+                    <div class="flex-grow space-y-2">
+                        {% if weather.frost_alert %}
+                            <div class="bg-rose-50 border border-rose-200 text-rose-700 rounded-xl px-3 py-2 text-xs font-semibold flex items-center space-x-2">
+                                <i class="fa-solid fa-snowflake"></i><span>⚠️ Rischio gelate nei prossimi giorni: proteggi le piante sul balcone/esterno!</span>
+                            </div>
+                        {% endif %}
+                        {% if weather.rain_hint %}
+                            <div class="bg-sky-50 border border-sky-200 text-sky-700 rounded-xl px-3 py-2 text-xs font-semibold flex items-center space-x-2">
+                                <i class="fa-solid fa-cloud-rain"></i><span>Pioggia oggi ({{ weather.today_rain_mm|round(1) }} mm): valuta di saltare l'annaffiatura manuale.</span>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <!-- 4-day forecast -->
+                    <div class="flex space-x-3 flex-shrink-0">
+                        {% for day in weather.days %}
+                            <div class="text-center bg-stone-50 rounded-2xl px-3 py-2 min-w-[68px]">
+                                <div class="text-[10px] font-bold text-stone-400 uppercase">{{ day.date }}</div>
+                                <i class="fa-solid {{ day.icon }} my-1 text-stone-600"></i>
+                                <div class="text-xs font-bold text-stone-700">{{ day.tmax }}°<span class="text-stone-400 font-medium">/{{ day.tmin }}°</span></div>
+                                <div class="text-[10px] text-sky-500">💧{{ day.rain_prob or 0 }}%</div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    {% endif %}
+
+
     <!-- 1. CRITICAL / URGENT TASKS (HIGHLIGHTED AT THE TOP) -->
     <div class="space-y-4">
         <div class="flex items-center space-x-3">

@@ -2,15 +2,16 @@ import os
 import re
 import base64
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 import json
 import threading
 import time
+import requests
 import google.generativeai as genai
 
-__version__ = "1.2.0"  # Fonte unica della versione (vedi CHANGELOG.md)
+__version__ = "1.3.0"  # Fonte unica della versione (vedi CHANGELOG.md)
 
 app = Flask(__name__)
 app.secret_key = "plant_tracker_super_secret_key"
@@ -90,6 +91,9 @@ class Settings(db.Model):
     openai_api_key = db.Column(db.String(500), nullable=True)
     google_api_key = db.Column(db.String(500), nullable=True)
     openrouter_api_key = db.Column(db.String(500), nullable=True)
+    weather_city = db.Column(db.String(100), nullable=True)      # Città per il meteo
+    telegram_bot_token = db.Column(db.String(500), nullable=True) # Token bot Telegram
+    telegram_chat_id = db.Column(db.String(100), nullable=True)   # Chat ID per le notifiche
 
 # Helper to get the AI model chosen by the user for a given provider
 def get_selected_model(settings, provider):
@@ -148,6 +152,130 @@ def run_with_timeout(func, timeout_seconds=AI_CALL_TIMEOUT_SECONDS):
         print(f"Chiamata IA interrotta dopo {timeout_seconds}s di attesa")
         return None
     return result.get('value')
+
+# --- METEO (Open-Meteo: gratuito, senza chiave API) ---
+
+_WEATHER_CACHE = {'ts': 0, 'data': None}
+_WEATHER_CACHE_TTL = 60 * 30  # 30 minuti
+_GEOCODE_CACHE = {}
+
+WEATHER_CODES = {
+    0: ('Sereno', 'fa-sun'), 1: ('Poco nuvoloso', 'fa-cloud-sun'), 2: ('Parzialmente nuvoloso', 'fa-cloud-sun'),
+    3: ('Nuvoloso', 'fa-cloud'), 45: ('Nebbia', 'fa-smog'), 48: ('Nebbia', 'fa-smog'),
+    51: ('Pioviggine', 'fa-cloud-rain'), 53: ('Pioviggine', 'fa-cloud-rain'), 55: ('Pioviggine', 'fa-cloud-rain'),
+    61: ('Pioggia leggera', 'fa-cloud-rain'), 63: ('Pioggia', 'fa-cloud-showers-heavy'), 65: ('Pioggia forte', 'fa-cloud-showers-heavy'),
+    71: ('Neve', 'fa-snowflake'), 73: ('Neve', 'fa-snowflake'), 75: ('Neve', 'fa-snowflake'),
+    80: ('Rovesci', 'fa-cloud-showers-heavy'), 81: ('Rovesci', 'fa-cloud-showers-heavy'), 82: ('Rovesci forti', 'fa-cloud-showers-water'),
+    95: ('Temporale', 'fa-bolt'), 96: ('Temporale grandine', 'fa-bolt'), 99: ('Temporale grandine', 'fa-bolt'),
+}
+
+def _geocode_city(city):
+    """Converte il nome città in coordinate via Open-Meteo Geocoding (con cache)."""
+    if city in _GEOCODE_CACHE:
+        return _GEOCODE_CACHE[city]
+    loc = None
+    try:
+        r = requests.get(
+            'https://geocoding-api.open-meteo.com/v1/search',
+            params={'name': city, 'count': 1, 'language': 'it', 'format': 'json'},
+            timeout=10
+        )
+        results = r.json().get('results') or []
+        if results:
+            loc = {'lat': results[0]['latitude'], 'lon': results[0]['longitude'],
+                   'name': results[0].get('name', city)}
+    except Exception as e:
+        print(f'Errore geocoding "{city}": {e}')
+    _GEOCODE_CACHE[city] = loc
+    return loc
+
+def get_weather():
+    """Meteo attuale + previsioni 4 giorni per la città configurata. None se non configurato."""
+    settings = get_app_settings()
+    city = (settings.weather_city or '').strip()
+    if not city:
+        return None
+    
+    now_ts = time.time()
+    if _WEATHER_CACHE['data'] and (now_ts - _WEATHER_CACHE['ts']) < _WEATHER_CACHE_TTL:
+        return _WEATHER_CACHE['data']
+    
+    loc = _geocode_city(city)
+    if not loc:
+        return {'error': f'Non riesco a trovare la città "{city}"'}
+    
+    try:
+        r = requests.get(
+            'https://api.open-meteo.com/v1/forecast',
+            params={
+                'latitude': loc['lat'], 'longitude': loc['lon'],
+                'current': 'temperature_2m',
+                'daily': 'temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,weather_code',
+                'timezone': 'auto', 'forecast_days': 4,
+            },
+            timeout=10
+        )
+        j = r.json()
+    except Exception as e:
+        print(f'Errore meteo: {e}')
+        return None
+    
+    daily = j.get('daily', {})
+    dates = daily.get('time', [])
+    tmax = daily.get('temperature_2m_max', [])
+    tmin = daily.get('temperature_2m_min', [])
+    pprob = daily.get('precipitation_probability_max', [])
+    psum = daily.get('precipitation_sum', [])
+    wcode = daily.get('weather_code', [])
+    
+    weather = {
+        'city': loc['name'],
+        'temp': j.get('current', {}).get('temperature_2m'),
+        'today_rain_mm': psum[0] if psum else None,
+        'days': [],
+        'frost_alert': False,
+        'rain_hint': False,
+    }
+    for i, dstr in enumerate(dates):
+        code_i = wcode[i] if i < len(wcode) else -1
+        day = {
+            'date': datetime.strptime(dstr, '%Y-%m-%d').strftime('%d/%m'),
+            'tmax': round(tmax[i]) if i < len(tmax) and tmax[i] is not None else None,
+            'tmin': round(tmin[i]) if i < len(tmin) and tmin[i] is not None else None,
+            'rain_prob': pprob[i] if i < len(pprob) else None,
+            'desc': WEATHER_CODES.get(code_i, ('—', 'fa-question'))[0],
+            'icon': WEATHER_CODES.get(code_i, ('—', 'fa-question'))[1],
+        }
+        weather['days'].append(day)
+        if day['tmin'] is not None and day['tmin'] <= 2:
+            weather['frost_alert'] = True
+    if weather['today_rain_mm'] is not None and weather['today_rain_mm'] >= 2:
+        weather['rain_hint'] = True
+    
+    _WEATHER_CACHE['ts'] = now_ts
+    _WEATHER_CACHE['data'] = weather
+    return weather
+
+# --- NOTIFICHE TELEGRAM ---
+
+def send_telegram(message):
+    """Invia una notifica Telegram se configurata (asincrona, mai blocca la pagina)."""
+    settings = get_app_settings()
+    token = settings.telegram_bot_token
+    chat_id = settings.telegram_chat_id
+    if not token or not chat_id:
+        return False
+    def _send():
+        try:
+            requests.post(
+                f'https://api.telegram.org/bot{token}/sendMessage',
+                json={'chat_id': chat_id, 'text': message, 'parse_mode': 'HTML'},
+                timeout=10
+            )
+        except Exception as e:
+            print(f'Errore invio Telegram: {e}')
+    threading.Thread(target=_send, daemon=True).start()
+    return True
 
 # Context processor to expose current season and month
 @app.context_processor
@@ -481,6 +609,7 @@ def ensure_watering_tasks():
     from datetime import timedelta
     now = datetime.utcnow()
     created = 0
+    created_plant_names = []
     
     plants = Plant.query.filter(
         Plant.watering_frequency_days.isnot(None),
@@ -521,10 +650,13 @@ def ensure_watering_tasks():
         )
         db.session.add(new_task)
         created += 1
+        created_plant_names.append(p.name)
     
     if created:
         db.session.commit()
         print(f"Generati {created} compiti di innaffiatura automatici")
+        # Notifica Telegram (se configurata) solo con le piante appena programmate
+        send_telegram(f"💧 <b>Florae</b>\nOggi da innaffiare:\n" + ', '.join(created_plant_names))
     return created
 
 
@@ -534,6 +666,8 @@ def ensure_watering_tasks():
 def dashboard():
     # Genera le innaffiature scadute PRIMA di caricare la bacheca
     ensure_watering_tasks()
+    # Meteo per la città configurata (None se non impostata)
+    weather = get_weather()
     
     # Fetch all tasks grouped by status and urgency
     urgent_tasks = Task.query.filter_by(status='pending', is_urgent=True).order_by(Task.created_at.desc()).all()
@@ -553,7 +687,8 @@ def dashboard():
                            completed_tasks=completed_tasks,
                            plants_count=plants_count,
                            pending_count=pending_count,
-                           plants=plants)
+                           plants=plants,
+                           weather=weather)
 
 
 @app.route('/plants')
@@ -940,6 +1075,10 @@ def apply_diagnosis():
     db.session.add(new_task)
     db.session.commit()
     
+    # Notifica Telegram per le diagnosi urgenti (se configurata)
+    if is_urgent:
+        send_telegram(f"🚨 <b>Florae</b>\nDiagnosi urgente per <b>{plant.name}</b>:\n{problem}")
+    
     tipo_compito = "compito urgente" if is_urgent else "compito"
     flash(f"Diagnosi applicata! Creato un {tipo_compito} per '{plant.name}' e aggiornato il database.", "success")
     return redirect(url_for('dashboard'))
@@ -972,6 +1111,9 @@ def settings():
         openai_api_key = request.form.get('openai_api_key', '').strip()
         google_api_key = request.form.get('google_api_key', '').strip()
         openrouter_api_key = request.form.get('openrouter_api_key', '').strip()
+        weather_city = request.form.get('weather_city', '').strip()
+        telegram_bot_token = request.form.get('telegram_bot_token', '').strip()
+        telegram_chat_id = request.form.get('telegram_chat_id', '').strip()
         
         # Sicurezza: accettiamo solo modelli presenti nel listino del provider scelto
         valid_models = [m['id'] for m in AI_MODELS.get(ai_provider, [])]
@@ -989,6 +1131,11 @@ def settings():
             settings.google_api_key = google_api_key
         if openrouter_api_key:
             settings.openrouter_api_key = openrouter_api_key
+        # Meteo e Telegram
+        settings.weather_city = weather_city or None
+        if telegram_bot_token:
+            settings.telegram_bot_token = telegram_bot_token  # token aggiornato solo se compilato
+        settings.telegram_chat_id = telegram_chat_id or None
         db.session.commit()
         
         flash("Configurazione salvata con successo! L'IA scelta è ora attiva (se hai inserito una chiave valida).", "success")
@@ -1004,10 +1151,103 @@ def settings():
                            current_provider=current_provider, 
                            current_model=current_model,
                            ai_models=AI_MODELS,
+                           weather_city=settings.weather_city or "",
+                           telegram_chat_id=settings.telegram_chat_id or "",
                            openai_key=openai_key, 
                            google_key=google_key,
                            openrouter_key=openrouter_key)
 
+
+# --- CHAT COL BOTANICO IA ---
+
+CHAT_SYSTEM_PROMPT = (
+    "Sei Florae Bot, un esperto agronomo e botanico virtuale dentro l'app Florae di gestione piante. "
+    "Rispondi SEMPRE in italiano, in modo pratico e conciso (max 150 parole salvo richiesta diversa). "
+    "Usa elenchi puntati per i consigli operativi. Se la domanda riguarda una pianta dell'utente, "
+    "basa la risposta sui suoi dati reali qui sotto.\n\n"
+)
+
+def _plants_context():
+    plants = Plant.query.order_by(Plant.name).limit(20).all()
+    if not plants:
+        return "L'utente non ha ancora piante salvate nel tracker."
+    lines = []
+    for p in plants:
+        freq = f", annaffiatura automatica ogni {p.watering_frequency_days} giorni" if p.watering_frequency_days else ""
+        lines.append(f"- {p.name} ({p.species or 'specie non indicata'}){freq}")
+    return "Piante reali dell'utente:\n" + "\n".join(lines)
+
+@app.route('/chatbot')
+def chatbot_page():
+    history = session.get('chat_history', [])
+    return render_template('chatbot.html', history=history)
+
+@app.route('/chatbot/send', methods=['POST'])
+def chatbot_send():
+    data = request.get_json(silent=True) or {}
+    message = (data.get('message') or '').strip()[:2000]
+    if not message:
+        return jsonify({'reply': 'Scrivi prima una domanda 🙂'})
+    
+    settings = get_app_settings()
+    api_key = settings.openai_api_key or os.environ.get('OPENAI_API_KEY') if (settings.ai_provider or 'openai') == 'openai' else (settings.google_api_key or os.environ.get('GOOGLE_API_KEY'))
+    if not api_key:
+        return jsonify({'reply': '⚠️ Per chattare serve una chiave API: configurala nella pagina Impostazioni.'})
+    
+    history = session.get('chat_history', [])
+    history.append({'role': 'user', 'content': message})
+    system_prompt = CHAT_SYSTEM_PROMPT + _plants_context()
+    recent = history[-12:]
+    
+    def _ask():
+        if (settings.ai_provider or 'openai') == 'openai':
+            import openai
+            client = openai.OpenAI(api_key=api_key)
+            resp = client.chat.completions.create(
+                model=get_selected_model(settings, 'openai'),
+                messages=[{'role': 'system', 'content': system_prompt}] + recent
+            )
+            return resp.choices[0].message.content.strip()
+        else:
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel(get_selected_model(settings, 'google'))
+            contents = [{'role': ('model' if h['role'] == 'assistant' else 'user'), 'parts': [h['content']]} for h in recent]
+            response = model.generate_content(contents)
+            return response.text.strip()
+    
+    reply = run_with_timeout(_ask, timeout_seconds=45)
+    if not reply:
+        reply = '⏱️ Non sono riuscito a rispondere in tempo. Riprova tra poco o scegli un modello più veloce nelle Impostazioni.'
+    
+    history.append({'role': 'assistant', 'content': reply})
+    session['chat_history'] = history[-14:]
+    return jsonify({'reply': reply})
+
+@app.route('/chatbot/clear', methods=['POST'])
+def chatbot_clear():
+    session.pop('chat_history', None)
+    return jsonify({'ok': True})
+
+# --- TEST NOTIFICA TELEGRAM ---
+
+@app.route('/settings/test_telegram', methods=['POST'])
+def test_telegram():
+    settings = get_app_settings()
+    token, cid = settings.telegram_bot_token, settings.telegram_chat_id
+    if not token or not cid:
+        flash("Prima salva il token del bot e il Chat ID.", "error")
+        return redirect(url_for('settings'))
+    try:
+        r = requests.post(
+            f'https://api.telegram.org/bot{token}/sendMessage',
+            json={'chat_id': cid, 'text': '🌱 <b>Florae</b>\nCollegamento riuscito! Riceverai qui le notifiche.', 'parse_mode': 'HTML'},
+            timeout=10
+        )
+        ok = r.json().get('ok', False)
+        flash("Messaggio inviato! Controlla Telegram." if ok else f"Telegram ha rifiutato la richiesta: {r.json().get('description','errore sconosciuto')}", "success" if ok else "error")
+    except Exception as e:
+        flash(f"Errore Telegram: {e}", "error")
+    return redirect(url_for('settings'))
 
 if __name__ == '__main__':
     with app.app_context():
@@ -1016,7 +1256,8 @@ if __name__ == '__main__':
         # Migrazione leggera: aggiunge le colonne nuove se non esistono ancora
         from sqlalchemy import text
         migrations = {
-            'settings': {'ai_model': 'VARCHAR(100)'},
+            'settings': {'ai_model': 'VARCHAR(100)', 'weather_city': 'VARCHAR(100)',
+                         'telegram_bot_token': 'VARCHAR(500)', 'telegram_chat_id': 'VARCHAR(100)'},
             'plant': {'watering_frequency_days': 'INTEGER'},
             'task': {'task_type': 'VARCHAR(20)', 'completed_at': 'DATETIME'},
         }

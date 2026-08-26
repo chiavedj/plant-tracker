@@ -106,6 +106,37 @@
 
             <p class="text-[11px] text-stone-500 mt-1.5 leading-relaxed">Nota: le chiavi vengono aggiornate solo se compili il campo — lasciandolo vuoto resta quella già salvata (o letta dalle variabili d'ambiente). Non vengono salvate in database pubblici.</p>
 
+            <!-- Weather City -->
+            <div class="pt-2 border-t border-stone-100">
+                <label class="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-2">
+                    <i class="fa-solid fa-cloud-sun text-sky-500 mr-1"></i> Meteo — La tua città
+                </label>
+                <input type="text" name="weather_city" value="{{ weather_city }}" placeholder="Es. Milano, Roma, Torino..."
+                       class="w-full bg-stone-50 border border-stone-200 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm">
+                <p class="text-[11px] text-stone-500 mt-1.5">Attiva la card meteo in bacheca: previsioni 4 giorni, allerte gelate e consiglio "ha piovuto, salta l'annaffiatura". Usa Open-Meteo (gratuito, nessuna chiave richiesta).</p>
+            </div>
+
+            <!-- Telegram Notifications -->
+            <div class="pt-2 border-t border-stone-100">
+                <label class="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-2">
+                    <i class="fa-brands fa-telegram text-sky-500 mr-1"></i> Notifiche Telegram
+                </label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
+                    <div>
+                        <label class="block text-[11px] font-bold text-stone-500 mb-1">Token del Bot</label>
+                        <input type="password" name="telegram_bot_token" placeholder="Es. 1234567890:AA..."
+                               class="w-full bg-stone-50 border border-stone-200 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-stone-500 mb-1">Chat ID</label>
+                        <input type="text" name="telegram_chat_id" value="{{ telegram_chat_id }}" placeholder="Es. 123456789"
+                               class="w-full bg-stone-50 border border-stone-200 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-mono">
+                    </div>
+                </div>
+                <p class="text-[11px] text-stone-500 leading-relaxed">Ricevi su Telegram gli avvisi di annaffiatura e le diagnosi urgenti.
+                    Crea il bot con <strong>@BotFather</strong>, poi scrivi al bot e trova il tuo Chat ID con <strong>@userinfobot</strong>.</p>
+            </div>
+
             <!-- Configuration info alert -->
             <div class="bg-emerald-50 border border-emerald-100 text-emerald-950 p-4.5 rounded-2xl flex items-start space-x-3 text-xs leading-relaxed">
                 <i class="fa-solid fa-circle-question text-emerald-600 text-lg mt-0.5 flex-shrink-0"></i>
@@ -130,6 +161,22 @@
                     <span>Salva Configurazione</span>
                 </button>
             </div>
+        </form>
+    </div>
+
+    <!-- Telegram Test Card -->
+    <div class="bg-white rounded-3xl border border-stone-200/80 shadow-md p-6 flex items-center justify-between gap-4">
+        <div class="flex items-center space-x-3">
+            <i class="fa-brands fa-telegram text-2xl text-sky-500"></i>
+            <div>
+                <h4 class="font-bold text-sm text-stone-900">Prova le notifiche</h4>
+                <p class="text-xs text-stone-500">Salva prima la configurazione, poi invia un messaggio di prova al tuo bot.</p>
+            </div>
+        </div>
+        <form action="/settings/test_telegram" method="POST" class="flex-shrink-0">
+            <button type="submit" class="bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow transition-all whitespace-nowrap">
+                <i class="fa-solid fa-paper-plane mr-1"></i> Messaggio di prova
+            </button>
         </form>
     </div>
 

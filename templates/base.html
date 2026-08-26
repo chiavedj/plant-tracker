@@ -67,6 +67,10 @@
                 <i class="fa-solid fa-wand-magic-sparkles text-lg w-6 text-center"></i>
                 <span>Analisi IA & Foto</span>
             </a>
+            <a href="/chatbot" class="flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-emerald-900/50 transition-all duration-200 {% if request.path == '/chatbot' %} bg-emerald-800 text-white font-semibold {% else %} text-emerald-100/80 {% endif %}">
+                <i class="fa-solid fa-comments text-lg w-6 text-center"></i>
+                <span>Botanico IA</span>
+            </a>
             <a href="/settings" class="flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-emerald-900/50 transition-all duration-200 {% if request.path == '/settings' %} bg-emerald-800 text-white font-semibold {% else %} text-emerald-100/80 {% endif %}">
                 <i class="fa-solid fa-sliders text-lg w-6 text-center"></i>
                 <span>Impostazioni</span>

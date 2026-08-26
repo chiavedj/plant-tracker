@@ -1,6 +1,6 @@
 # 🌿 Florae - Plant Care Tracker & AI Diagnosis
 
-![Version](https://img.shields.io/badge/version-1.2.0-emerald) ![Python](https://img.shields.io/badge/python-3.9%2B-blue) ![Flask](https://img.shields.io/badge/flask-3.0-grey) ![License](https://img.shields.io/badge/license-MIT-green) ![Docker](https://img.shields.io/badge/docker-ghcr.io-2496ED)
+![Version](https://img.shields.io/badge/version-1.3.0-emerald) ![Python](https://img.shields.io/badge/python-3.9%2B-blue) ![Flask](https://img.shields.io/badge/flask-3.0-grey) ![License](https://img.shields.io/badge/license-MIT-green) ![Docker](https://img.shields.io/badge/docker-ghcr.io-2496ED)
 
 ![Florae Screenshot](flore.png)
 
@@ -10,6 +10,9 @@ Florae is a local-first web application for tracking and caring for your plants,
 
 1. **Activity Dashboard**: High-visibility panel (top of the page) showing urgent tasks — sick plants or those needing immediate watering.
 2. **Automatic Watering Reminders** 🆕: set a watering frequency (in days) for each plant and Florae automatically creates the "💧 Water" task on your dashboard when it's time — complete it, and the next one schedules itself.
+3. **AI Botanist Chat** 🆕: chat with a virtual agronomist who knows every plant in your tracker. Uses the provider/model you picked in Settings.
+4. **Weather & Frost Alerts** 🆕: current conditions + 4-day forecast on your dashboard (Open-Meteo, no API key needed). Frost warnings for outdoor plants and "it rained — skip watering today" hints.
+5. **Telegram Notifications** 🆕: get pinged when watering tasks are scheduled or an urgent AI diagnosis lands.
 2. **Seasonal Care Tracking**: Dynamic care tips based on the current month for each plant in your database.
 3. **Personal Botanical Database**: Manage and browse detailed plant cards (light exposure, watering needs, general care, seasonal calendar).
 4. **AI Photo Diagnosis**: Upload a photo of struggling leaves or stems. The AI identifies the plant, diagnoses the disease/problem, and suggests a detailed treatment. Click "Apply & Save to Database" to automatically add the task to your urgent dashboard!

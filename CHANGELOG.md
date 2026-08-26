@@ -5,6 +5,23 @@ Tutte le modifiche importanti a questo progetto vengono documentate in questo fi
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/it/1.1.0/)
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.3.0] – 2025-08-26
+
+### Aggiunto
+- **🤖 Chat col Botanico IA**: nuova pagina "Botanico IA" nel menu. Chatta con un agronomo virtuale che:
+  - conosce tutte le piante del tuo tracker (nomi, specie, frequenze di annaffiatura)
+  - usa il provider e il modello che hai scelto nelle impostazioni
+  - mantiene la conversazione per tutta la sessione (con pulsante "Azzera")
+  - timeout di 45s: mai attese infinite
+- **☀️ Meteo in dashboard** (Open-Meteo, gratuito, nessuna chiave API):
+  - temperatura attuale + previsioni 4 giorni della tua città
+  - allerta rossa rischio gelate (proteggi le piante esterne!)
+  - consiglio intelligente: se piove ≥2mm suggerisce di saltare l'annaffiatura manuale
+  - si configura dalla pagina Impostazioni con il solo nome città; cache 30 min
+- **🔔 Notifiche Telegram**: avvisi automatici su Telegram quando vengono programmate innaffiature e quando una diagnosi crea un compito urgente
+  - token bot + Chat ID configurabili nelle Impostazioni con pulsante "Messaggio di prova"
+  - invii asincroni: non rallentano mai l'app
+
 ## [1.2.0] – 2025-08-26
 
 ### Aggiunto

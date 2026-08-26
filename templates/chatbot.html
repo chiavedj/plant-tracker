@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto flex flex-col h-[calc(100vh-12rem)]">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between gap-4 mb-4">
+        <div class="flex items-center space-x-3">
+            <div class="bg-emerald-100 text-emerald-700 w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm">
+                <i class="fa-solid fa-comments text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-extrabold text-stone-900 tracking-tight">Botanico IA</h1>
+                <p class="text-xs text-stone-500">Chiedi qualsiasi cosa sulle tue piante — conosce il tuo tracker</p>
+            </div>
+        </div>
+        <button id="clear-chat-btn" title="Nuova conversazione"
+                class="bg-stone-100 hover:bg-stone-200 text-stone-600 font-semibold text-xs px-3 py-2 rounded-xl transition-all">
+            <i class="fa-solid fa-broom mr-1"></i> Azzera
+        </button>
+    </div>
+
+    <!-- Chat Window -->
+    <div class="bg-white rounded-3xl border border-stone-200/80 shadow-md flex flex-col flex-grow overflow-hidden">
+        <!-- Messages -->
+        <div id="chat-messages" class="flex-grow overflow-y-auto p-5 space-y-4">
+            {% if history %}
+                {% for msg in history %}
+                    {% if msg.role == 'user' %}
+                        <div class="flex justify-end">
+                            <div class="bg-emerald-700 text-white rounded-2xl rounded-br-md px-4 py-2.5 max-w-[80%] text-sm leading-relaxed whitespace-pre-line">{{ msg.content }}</div>
+                        </div>
+                    {% else %}
+                        <div class="flex justify-start">
+                            <div class="bg-stone-100 border border-stone-200/70 text-stone-800 rounded-2xl rounded-bl-md px-4 py-2.5 max-w-[85%] text-sm leading-relaxed whitespace-pre-line">
+                                <i class="fa-solid fa-leaf text-emerald-500 mr-1.5 text-xs"></i>{{ msg.content }}
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                <div class="text-center py-8 space-y-3">
+                    <div class="text-4xl">🪴</div>
+                    <h3 class="font-serif font-bold text-stone-800">Ciao! Sono Florae Bot 🌿</h3>
+                    <p class="text-xs text-stone-500 max-w-md mx-auto leading-relaxed">
+                        Conosco tutte le piante del tuo tracker e posso consigliarti su annaffiature, malattie, concimazioni, rinvasi ed esposizione.<br>
+                        Prova: <em>"Devo innaffiare oggi?"</em>, <em>"Perché la mia Monstera ha foglie gialle?"</em>
+                    </p>
+                </div>
+            {% endif %}
+            <div id="typing-indicator" class="hidden flex justify-start">
+                <div class="bg-stone-100 border border-stone-200/70 rounded-2xl rounded-bl-md px-4 py-3 text-stone-400 text-sm">
+                    <i class="fa-solid fa-circle-notch fa-spin mr-2"></i>Florae Bot sta pensando...
+                </div>
+            </div>
+        </div>
+
+        <!-- Input -->
+        <div class="border-t border-stone-100 p-4 bg-white">
+            <div class="flex items-center space-x-2">
+                <input type="text" id="chat-input" placeholder="Scrivi la tua domanda..."
+                       autocomplete="off"
+                       class="flex-grow bg-stone-50 border border-stone-200 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                <button id="send-btn" class="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold px-5 py-3 rounded-xl shadow transition-all">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const messagesDiv = document.getElementById('chat-messages');
+    const input = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('send-btn');
+    const typing = document.getElementById('typing-indicator');
+    const clearBtn = document.getElementById('clear-chat-btn');
+
+    function addMessage(role, content) {
+        typing.classList.add('hidden');
+        const wrapper = document.createElement('div');
+        if (role === 'user') {
+            wrapper.className = 'flex justify-end';
+            wrapper.innerHTML = '<div class="bg-emerald-700 text-white rounded-2xl rounded-br-md px-4 py-2.5 max-w-[80%] text-sm leading-relaxed whitespace-pre-line"></div>';
+            wrapper.firstChild.textContent = content;
+        } else {
+            wrapper.className = 'flex justify-start';
+            wrapper.innerHTML = '<div class="bg-stone-100 border border-stone-200/70 text-stone-800 rounded-2xl rounded-bl-md px-4 py-2.5 max-w-[85%] text-sm leading-relaxed whitespace-pre-line"><i class="fa-solid fa-leaf text-emerald-500 mr-1.5 text-xs"></i></div>';
+            wrapper.querySelector('div').append(content);
+        }
+        messagesDiv.insertBefore(wrapper, typing);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    function send() {
+        const text = input.value.trim();
+        if (!text || sendBtn.disabled) return;
+        input.value = '';
+        sendBtn.disabled = true;
+        addMessage('user', text);
+        typing.classList.remove('hidden');
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+        fetch('/chatbot/send', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({message: text})
+        })
+        .then(r => r.json())
+        .then(d => addMessage('assistant', d.reply))
+        .catch(() => addMessage('assistant', '⚠️ Errore di connessione. Riprova.'))
+        .finally(() => { sendBtn.disabled = false; input.focus(); });
+    }
+
+    sendBtn.addEventListener('click', send);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); send(); } });
+
+    clearBtn.addEventListener('click', () => {
+        fetch('/chatbot/clear', {method: 'POST'}).then(() => location.reload());
+    });
+</script>
+{% endblock %}
