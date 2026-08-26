@@ -226,6 +226,15 @@
             </div>
 
             <div>
+                <label class="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1">💧 Annaffiatura Automatica (ogni quanti giorni?)</label>
+                <div class="flex items-center space-x-3 bg-emerald-50/60 border border-emerald-100 p-3 rounded-xl">
+                    <input type="number" min="1" max="365" name="watering_frequency_days" id="form-freq" placeholder="Es. 7"
+                           class="w-24 bg-white border border-stone-200 p-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                    <p class="text-[11px] text-stone-500 leading-snug">Se compili questo campo, Florae crea da sola il compito "Innaffia" nella bacheca ogni X giorni. Lascia vuoto per disattivarla.</p>
+                </div>
+            </div>
+
+            <div>
                 <label class="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1">Istruzioni Generali di Cura</label>
                 <textarea name="care" id="form-care" rows="3" placeholder="Pulisci le foglie, tieni lontano da fonti di calore, fertilizzante ogni 2 settimane..."
                           class="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"></textarea>
@@ -315,6 +324,7 @@
         document.getElementById('form-exposure').value = "";
         document.getElementById('form-watering').value = "";
         document.getElementById('form-care').value = "";
+        document.getElementById('form-freq').value = "";
         
         document.getElementById('form-spring').value = "Ricomincia a concimare una volta al mese. Innaffia con più regolarità.";
         document.getElementById('form-summer').value = "Innaffia frequentemente, controllando che il terreno non si secchi del tutto. Proteggi dai raggi solari troppo intensi.";
@@ -337,6 +347,7 @@
                 document.getElementById('form-exposure').value = data.exposure;
                 document.getElementById('form-watering').value = data.watering;
                 document.getElementById('form-care').value = data.care;
+                document.getElementById('form-freq').value = data.watering_frequency_days || "";
                 
                 document.getElementById('form-spring').value = data.spring_care;
                 document.getElementById('form-summer').value = data.summer_care;

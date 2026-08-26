@@ -10,7 +10,7 @@ import threading
 import time
 import google.generativeai as genai
 
-__version__ = "1.1.2"  # Fonte unica della versione (vedi CHANGELOG.md)
+__version__ = "1.2.0"  # Fonte unica della versione (vedi CHANGELOG.md)
 
 app = Flask(__name__)
 app.secret_key = "plant_tracker_super_secret_key"
@@ -40,6 +40,7 @@ class Plant(db.Model):
     winter_care = db.Column(db.Text, nullable=True)
     
     image_url = db.Column(db.String(250), nullable=True)
+    watering_frequency_days = db.Column(db.Integer, nullable=True)  # Innaffiatura automatica: intervallo in giorni
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationship to tasks
@@ -61,6 +62,8 @@ class Task(db.Model):
     due_date = db.Column(db.String(50), nullable=True)  # Data o intervallo temporale
     is_urgent = db.Column(db.Boolean, default=False)
     status = db.Column(db.String(20), default='pending')  # pending, completed
+    task_type = db.Column(db.String(20), nullable=True)   # None = manuale, 'watering' = innaffiatura automatica
+    completed_at = db.Column(db.DateTime, nullable=True)  # Quando è stata completata (per la ricorrenza)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 # Modelli IA disponibili, suddivisi per provider
@@ -469,10 +472,69 @@ def get_seasonal_suggestions():
     return default_suggestions
 
 
+# --- INNAFFIATURE RICORRENTI AUTOMATICHE ---
+
+def ensure_watering_tasks():
+    """Per ogni pianta con frequenza impostata, crea il compito 'Innaffia'
+    quando l'intervallo è scaduto. Chiamata ad ogni apertura della dashboard.
+    Ritorna il numero di compiti creati."""
+    from datetime import timedelta
+    now = datetime.utcnow()
+    created = 0
+    
+    plants = Plant.query.filter(
+        Plant.watering_frequency_days.isnot(None),
+        Plant.watering_frequency_days > 0
+    ).all()
+    
+    for p in plants:
+        freq_days = p.watering_frequency_days
+        
+        # C'è già un'innaffiatura in attesa? Niente da fare
+        pending = Task.query.filter_by(plant_id=p.id, task_type='watering', status='pending').first()
+        if pending:
+            continue
+        
+        # Quando è stata innaffiata l'ultima volta?
+        last_done = Task.query.filter_by(plant_id=p.id, task_type='watering', status='completed')\
+                              .order_by(Task.completed_at.desc()).first()
+        
+        if last_done and last_done.completed_at:
+            days_since = (now - last_done.completed_at).days
+            if days_since < freq_days:
+                continue  # Non è ancora ora
+            # Se è in ritardo, la data scadenza resta "oggi"
+            due_date = now.strftime('%d/%m/%Y')
+        else:
+            # Prima programmazione: compito immediato per partire col ritmo
+            days_since = None
+            due_date = now.strftime('%d/%m/%Y')
+        
+        new_task = Task(
+            plant_id=p.id,
+            title=f"💧 Innaffia {p.name}",
+            description=(p.watering or '')[:300] or 'Innaffiatura programmata automaticamente.',
+            due_date=due_date,
+            is_urgent=False,
+            status='pending',
+            task_type='watering'
+        )
+        db.session.add(new_task)
+        created += 1
+    
+    if created:
+        db.session.commit()
+        print(f"Generati {created} compiti di innaffiatura automatici")
+    return created
+
+
 # --- ROUTES ---
 
 @app.route('/')
 def dashboard():
+    # Genera le innaffiature scadute PRIMA di caricare la bacheca
+    ensure_watering_tasks()
+    
     # Fetch all tasks grouped by status and urgency
     urgent_tasks = Task.query.filter_by(status='pending', is_urgent=True).order_by(Task.created_at.desc()).all()
     pending_tasks = Task.query.filter_by(status='pending', is_urgent=False).order_by(Task.created_at.desc()).all()
@@ -516,6 +578,13 @@ def add_plant():
     autumn_care = (request.form.get('autumn_care') or '').strip() or "Riduci gradualmente le annaffiature. Sospendi le concimazioni. Riporta in casa se la pianta soffre il freddo."
     winter_care = (request.form.get('winter_care') or '').strip() or "Innaffia solo sporadicamente. Assicurati che la stanza sia luminosa e lontana dai termosifoni."
     
+    # Frequenza innaffiatura automatica (giorni, opzionale)
+    try:
+        watering_freq = int(request.form.get('watering_frequency_days'))
+        if watering_freq < 1: raise ValueError
+    except (TypeError, ValueError):
+        watering_freq = None
+    
     # Handle image upload
     image_file = request.files.get('image')
     image_url = None
@@ -540,7 +609,8 @@ def add_plant():
         summer_care=summer_care,
         autumn_care=autumn_care,
         winter_care=winter_care,
-        image_url=image_url
+        image_url=image_url,
+        watering_frequency_days=watering_freq
     )
     db.session.add(new_plant)
     db.session.commit()
@@ -578,6 +648,7 @@ def plant_details(id):
         "autumn_care": plant.autumn_care,
         "winter_care": plant.winter_care,
         "image_url": plant.image_url or '/static/img/placeholder.svg',
+        "watering_frequency_days": plant.watering_frequency_days,
         "tasks": tasks_list  # Inviamo la lista delle attività
     })
 
@@ -599,6 +670,12 @@ def edit_plant(id):
     plant.summer_care = request.form.get('summer_care')
     plant.autumn_care = request.form.get('autumn_care')
     plant.winter_care = request.form.get('winter_care')
+    
+    # Frequenza innaffiatura automatica (giorni, opzionale)
+    try:
+        plant.watering_frequency_days = int(request.form.get('watering_frequency_days')) or None
+    except (TypeError, ValueError):
+        plant.watering_frequency_days = None
     
     # Image update (optional)
     image_file = request.files.get('image')
@@ -730,6 +807,7 @@ def add_task():
 def complete_task(id):
     task = Task.query.get_or_404(id)
     task.status = 'completed'
+    task.completed_at = datetime.utcnow()  # Usato dalle innaffiature ricorrenti
     db.session.commit()
     flash("Attività completata! Ottimo lavoro!", "success")
     return redirect(url_for('dashboard'))
@@ -935,13 +1013,23 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
         
-        # Migrazione leggera: aggiunge la colonna ai_model se non esiste ancora
+        # Migrazione leggera: aggiunge le colonne nuove se non esistono ancora
         from sqlalchemy import text
+        migrations = {
+            'settings': {'ai_model': 'VARCHAR(100)'},
+            'plant': {'watering_frequency_days': 'INTEGER'},
+            'task': {'task_type': 'VARCHAR(20)', 'completed_at': 'DATETIME'},
+        }
         with db.engine.connect() as conn:
-            columns = [row[1] for row in conn.execute(text("PRAGMA table_info(settings)"))]
-            if 'ai_model' not in columns:
-                conn.execute(text("ALTER TABLE settings ADD COLUMN ai_model VARCHAR(100)"))
-                conn.commit()
+            for table, cols in migrations.items():
+                existing_cols = [row[1] for row in conn.execute(text(f"PRAGMA table_info({table})"))]
+                if not existing_cols:
+                    continue  # tabella non esiste (db vuoto): create_all l'ha già creata nuova
+                for col_name, col_type in cols.items():
+                    if col_name not in existing_cols:
+                        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}"))
+                        print(f"Migrazione: aggiunta colonna {table}.{col_name}")
+            conn.commit()
         
         # Populate with some default plants if db is empty
         if Plant.query.count() == 0:

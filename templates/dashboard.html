@@ -79,6 +79,9 @@
                                     {% if task.plant %}
                                         <span class="text-rose-800 text-xs font-semibold bg-rose-100/50 px-2 py-0.5 rounded-md">{{ task.plant.name }}</span>
                                     {% endif %}
+                                    {% if task.task_type == 'watering' %}
+                                        <span class="text-sky-700 text-[10px] font-bold uppercase bg-sky-100 border border-sky-200 px-2 py-0.5 rounded-full">💧 Automatica</span>
+                                    {% endif %}
                                 </div>
                                 <h3 class="text-xl font-bold text-stone-900 mt-1.5">{{ task.title }}</h3>
                                 <p class="text-stone-700 text-sm mt-1 leading-relaxed whitespace-pre-line">{{ task.description }}</p>
@@ -133,6 +136,9 @@
                                             <span class="text-emerald-800 text-[11px] font-bold bg-emerald-50 px-2 py-0.5 rounded-md">{{ task.plant.name }}</span>
                                         {% else %}
                                             <span class="text-stone-500 text-[11px] font-bold bg-stone-100 px-2 py-0.5 rounded-md">Generale</span>
+                                        {% endif %}
+                                        {% if task.task_type == 'watering' %}
+                                            <span class="text-sky-700 text-[10px] font-bold uppercase bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full">💧 Auto</span>
                                         {% endif %}
                                         <span class="text-stone-400 text-xs">• Scade: {{ task.due_date }}</span>
                                     </div>

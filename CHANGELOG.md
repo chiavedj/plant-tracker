@@ -5,6 +5,15 @@ Tutte le modifiche importanti a questo progetto vengono documentate in questo fi
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/it/1.1.0/)
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.2.0] – 2025-08-26
+
+### Aggiunto
+- **💧 Innaffiature ricorrenti automatiche**: per ogni pianta puoi impostare la frequenza (in giorni) e Florae genera da sola il compito "Innaffia" nella bacheca quando è ora
+  - Nessun duplicato: se un compito è già in attesa non ne crea altri
+  - Rispetta l'intervallo: dopo aver completato l'annaffiatura attende X giorni prima di riprogrammare
+  - Badge "💧 Automatica" sui compiti generati in dashboard
+- Nuovo campo nel form piante con spiegazione integrata
+
 ## [1.1.2] – 2025-08-24
 
 ### Aggiunto
