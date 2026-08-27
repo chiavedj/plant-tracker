@@ -291,75 +291,73 @@ def send_telegram(message):
 
 # --- PULIZIA RISPOSTE CHAT (modelli come Gemma "pensano ad alta voce") ---
 
-_IT_WORDS = set([
-    'per', 'se', 'oggi', 'del', 'della', 'dei', 'delle', 'con', 'un', 'una', 'uno',
-    'solo', 'i', 'gli', 'le', 'la', 'il', 'di', 'da', 'in', 'su', 'tra', 'fra',
-    'terra', 'terreno', 'piante', 'pianta', 'innaffia', 'innaffiare', 'annaffia',
-    'annaffiare', 'così', 'non', 'avendo', 'e', 'ed', 'sono', 'queste', 'seguendo',
-    'linee', 'guida', 'sempre', 'prima', 'procedi', 'controlla', 'radici', 'asciutto',
-    'asciutti', 'asciutta', 'asciutte', 'umido', 'umidi', 'umida', 'frequente',
-    'moderato', 'sporadico', 'ricorda', 'evitare', 'sottovasi', 'ciao', 'come', 'posso',
-    'aiutarti', 'foglie', 'vaso', 'sole', 'luce', 'acqua', 'concime', 'cura', 'cure'
-])
-
-_SCRATCHPAD_PREFIXES = (
-    '* role:', '* context:', '* the user', '* user', '* general',
-    '* check', '* ensure', '* keep', '* group', '* orchid', '* moderate',
-    '* low', '* special', '* high', '* guidance', '* greeting',
-    '* no preambles', '* based on', '* drafting', '* final polish',
-    '* self-correction', 'persona:', 'app:', 'user question:',
-    'user prompt:', 'since the prompt', 'user persona:', 'role:', 'context:'
-)
+_IT_WORDS_DETECT = {
+    'il', 'lo', 'la', 'i', 'gli', 'le', 'un', 'uno', 'una', 'di', 'a', 'da', 'in', 'con', 'su',
+    'per', 'tra', 'fra', 'e', 'ed', 'o', 'se', 'non', 'che', 'chi', 'come', 'dove', 'perché',
+    'quando', 'anche', 'ancora', 'più', 'meno', 'molto', 'poco', 'tutto', 'sono', 'è', 'siamo',
+    'hanno', 'ho', 'ha', 'terreno', 'terra', 'pianta', 'piante', 'acqua', 'annaffia', 'annaffiare',
+    'innaffia', 'innaffiare', 'umido', 'asciutto', 'radici', 'foglie', 'vaso', 'sottovasi', 'consiglio',
+    'oggi', 'sempre', 'prima', 'procedi', 'così', 'dati', 'ciao', 'ecco', 'decidere',
+    'risultano', 'varietà', 'gestire', 'regolarmente', 'nebulizza', 'controlla', 'queste', 'priorità'
+}
 
 def clean_chat_reply(text):
-    """Estrae al 100% SOLO ed esclusivamente la risposta finale in italiano,
-    scartando qualsiasi scratchpad/ragionamento in inglese generato da modelli come Gemma."""
+    """Estrae in modo deterministico e al 100% solo ed esclusivamente la risposta finale in italiano,
+    scartando qualsiasi scratchpad, bozza o planning in inglese generato da Gemma."""
     t = (text or '').strip()
     if not t:
         return t
 
-    # 1. Rimuovi tag think e note tra parentesi
+    # 1. Rimuovi tag think e note sul conteggio parole
     t = re.sub(r'<think>[\s\S]*?</think>', '', t, flags=re.IGNORECASE).strip()
     t = re.sub(r'\(Word count[^\)]*\)', '', t, flags=re.IGNORECASE)
 
-    # 2. Dividi in righe per trovare il punto esatto di inizio della vera risposta italiana
-    lines = t.split('\n')
-    start_idx = -1
+    # 2. Taglia marcatori di self-correction a fine risposta
+    for cut in ['*Self-Correction', 'Self-Correction during']:
+        idx = t.find(cut, 100)
+        if idx != -1:
+            t = t[:idx].strip()
 
+    # 3. Se c'è un marcatore esplicito di bozza finale pulita, prendi da lì
+    for f_mark in ['*Final Polish:*', 'Final Polish:', '**Final Polish:**']:
+        idx = t.rfind(f_mark)
+        if idx != -1:
+            t = t[idx + len(f_mark):].strip()
+            break
+
+    lines = t.split('\n')
+    start_line_idx = -1
+
+    # 4. Trova la prima riga discorsiva in italiano (non un punto elenco o intestazione di prompt)
     for i, line in enumerate(lines):
-        line_clean = line.strip().lower()
+        line_clean = line.strip()
         if not line_clean:
             continue
 
-        # Salta righe di scratchpad evidenti
-        if any(line_clean.startswith(p) for p in _SCRATCHPAD_PREFIXES):
+        # Salta punti elenco, titoli e intestazioni di prompt
+        if line_clean.startswith(('*', '-', '#', '>')) or any(line_clean.lower().startswith(k) for k in [
+            'persona:', 'role:', 'app:', 'user:', 'since ', 'context:', '*drafting:', 'drafting:'
+        ]):
             continue
 
-        # Conta parole italiane nella riga
-        words = re.findall(r"[a-zA-Zàèéìòù']+", line.lower())
-        it_count = sum(1 for w in words if w in _IT_WORDS)
-
-        # Se la riga contiene parole italiane e non è un'intestazione in inglese
-        if it_count >= 2 and not line.strip().startswith(('* Role', '* Context', '* User', 'Persona:', 'Role:')):
-            start_idx = i
+        words = re.findall(r"[a-zA-Zàèéìòù']+", line_clean.lower())
+        it_count = sum(1 for w in words if w in _IT_WORDS_DETECT)
+        if it_count >= 2:
+            start_line_idx = i
             break
 
-    if start_idx != -1:
-        # Prendi tutte le righe dal punto di inizio in poi
-        content = '\n'.join(lines[start_idx:]).strip()
+    if start_line_idx != -1:
+        res = '\n'.join(lines[start_line_idx:]).strip()
+        return res
 
-        # Taglia eventuali blocchi di self-correction o bozze ripetute alla fine
-        for cut_marker in ['*Self-Correction', 'Self-Correction during', '*Drafting:']:
-            c_idx = content.find(cut_marker)
-            if c_idx != -1:
-                content = content[:c_idx].strip()
-
-        # Rimuovi eventuali righe finali spezzate o orfane
-        content_lines = [l for l in content.split('\n') if not any(l.strip().lower().startswith(p) for p in _SCRATCHPAD_PREFIXES)]
-        cleaned = '\n'.join(content_lines).strip()
-        return cleaned if len(cleaned) > 10 else t
-
-    return t
+    # 5. Fallback: filtra le righe che contengono parole chiave di scratchpad
+    res_lines = []
+    scratchpad_kws = ['persona:', 'role:', 'app:', 'user:', 'since the', 'context:', 'drafting:', 'word count', 'goal:', 'constraints:']
+    for l in lines:
+        if any(k in l.lower() for k in scratchpad_kws):
+            continue
+        res_lines.append(l)
+    return '\n'.join(res_lines).strip()
 # Context processor to expose current season and month
 @app.context_processor
 def utility_processor():
@@ -1317,14 +1315,18 @@ def chatbot_send():
         else:
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel(model_id)
-            contents = [{'role': ('model' if h['role'] == 'assistant' else 'user'), 'parts': [h['content']]} for h in recent]
-            # I modelli Gemma non supportano system_instruction: iniettiamo il
-            # contesto (istruzioni + piante reali dell'utente) nel primo turno utente
-            ctx = f"{system_prompt}\n---\nDomanda dell'utente: "
-            if contents and contents[0]['role'] == 'user':
+            contents = [{'role': ('model' if h['role'] == 'assistant' else 'user'), 'parts': [clean_chat_reply(h['content']) if h['role'] == 'assistant' else h['content']]} for h in recent]
+            # Inietta le istruzioni e le piante nel messaggio più recente dell'utente
+            # con indicazione tassativa di rispondere SOLO in italiano senza preamboli
+            ctx = (
+                f"{system_prompt}\n"
+                "Istruzione finale per questa domanda: Rispondi DIRETTAMENTE in italiano con la sola risposta finale. "
+                "Non scrivere MAI 'Persona:', 'Role:', 'Goal:', né alcun testo in inglese.\n---\n"
+            )
+            if contents and contents[-1]['role'] == 'user':
+                contents[-1]['parts'][0] = ctx + str(contents[-1]['parts'][0])
+            elif contents and contents[0]['role'] == 'user':
                 contents[0]['parts'][0] = ctx + str(contents[0]['parts'][0])
-            else:
-                contents.insert(0, {'role': 'user', 'parts': [ctx + '(saluta e chiedi come puoi aiutare)']})
             response = model.generate_content(contents)
             return response.text.strip()
     

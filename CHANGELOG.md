@@ -1,5 +1,12 @@
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.5.5] – 2025-08-26
+
+### Corretto
+- **Chatbot: eliminazione definitiva e categorica di qualsiasi traccia di ragionamento e scratchpad in inglese** — riscritto il motore di estrazione per individuare esattamente la prima riga di risposta utile in italiano ed eliminare al 100% tutte le note di pianificazione (`* Role:`, `* Context:`, `* General watering rule:`, `* Check soil with a finger`, ecc.)
+
+
+
 ## [1.5.4] – 2025-08-26
 
 ### Corretto
