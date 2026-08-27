@@ -11,7 +11,7 @@ import time
 import requests
 import google.generativeai as genai
 
-__version__ = "1.5.2"  # Fonte unica della versione (vedi CHANGELOG.md)
+__version__ = "1.5.3"  # Fonte unica della versione (vedi CHANGELOG.md)
 
 app = Flask(__name__)
 app.secret_key = "plant_tracker_super_secret_key"
@@ -291,68 +291,68 @@ def send_telegram(message):
 
 # --- PULIZIA RISPOSTE CHAT (modelli come Gemma "pensano ad alta voce") ---
 
-# Marker dopo cui inizia tipicamente la risposta vera di Gemma
-_FINAL_ANSWER_MARKERS = [
-    '*Final Polish:*', '**Final Polish:**', 'Final Polish:',
-    '*Final Answer:*', 'Final Answer:', '**Final answer:**',
-    '*Risposta finale:*', 'Risposta finale:',
-]
-
-# Pattern di righe che sono chiaramente appunti interni del modello, non risposta
-_INTERNAL_NOTE_PATTERNS = [
-    r'^\s*\**\s*(User Persona|Goal|Constraint|Input|Strict Output|Output Rule|Format|Language|Style)\b.*',
-    r'^\s*-\s*\**\s*(User Persona|Goal|Constraint|Input|Strict Output|Output Rule|Format|Language|Style)\b.*',
-    r'\*\s*\**(Option \d|Drafting|Final Polish|Final answer check|Word count)',
-    r'^\s*\**\s*(Italian|Concise|Bullet points|Based on data|No preamble|Specific|Greeting)\?\s*(Yes|No)?.*$',
-    r'^\s*\*\s*(High Water Needs|Moderate|Low Water|Specific Needs|Category \d|Instruction):.*$',
-    r'^\s*-\s*\**(High Water Needs|Moderate|Low Water|Specific Needs|Category \d|Instruction):.*$',
-]
-
-def _dedup_similar_blocks(t, threshold=0.7):
-    """Se il modello ripete la stessa risposta più volte (comune in Gemma),
-    tiene una sola copia di ciascun blocco di testo simile."""
-    import difflib
-    blocks = [b.strip() for b in t.split('\n\n') if b.strip()]
-    kept = []
-    for b in blocks:
-        dup = False
-        for i, k in enumerate(kept):
-            if difflib.SequenceMatcher(None, k.lower(), b.lower()).ratio() > threshold:
-                if len(b) > len(k):
-                    kept[i] = b  # tieni la versione più completa
-                dup = True
-                break
-        if not dup:
-            kept.append(b)
-    return '\n\n'.join(kept)
+_TRASH_RE = re.compile(
+    r'(\b(Persona|App|Goal|Constraints?|Input|Strict Output|Output Rule|Format|Language|Style|User\'s Plants|User Question|User Prompt)\b\s*:|'
+    r'\b(Since the prompt|High water|Moderate/Regular|Low water|Greeting|Guidance|Categorized list|No preambles|Based on user)\b|'
+    r'\b(Italian\?|Concise\?|Bullet points\?|Word count|Drafting|Final Polish|Self-Correction)\b)',
+    re.IGNORECASE
+)
 
 def clean_chat_reply(text):
     """Rimuove il ragionamento interno leakato dai modelli (es. Gemma),
-    tenendo solo la risposta finale."""
+    tenendo solo ed esclusivamente la risposta finale in italiano."""
     t = (text or '').strip()
     if not t:
         return t
-    # 1) Rimuovi note tipo "(Word count: ~80 words. Perfect.)"
-    t = re.sub(r'\((?:Word count|word count)[^\)]*\)\s*', '', t)
-    # 2) Se c'è un marker di risposta finale, tieni solo ciò che segue l'ULTIMO
-    best_start = None
-    for marker in _FINAL_ANSWER_MARKERS:
-        idx = t.rfind(marker)
+
+    # 1. Rimuovi tag think o note word count
+    t = re.sub(r'<think>[\s\S]*?</think>', '', t, flags=re.IGNORECASE).strip()
+    t = re.sub(r'\(Word count[^\)]*\)', '', t, flags=re.IGNORECASE)
+
+    # 2. Se c'è un blocco "*Self-Correction" o "*Drafting:" dopo la prima metà, taglia
+    for marker in ['*Self-Correction', 'Self-Correction', '*Drafting:*']:
+        idx = t.find(marker, 100)
         if idx != -1:
-            nl = t.find('\n', idx)
-            start = (nl + 1) if nl != -1 else None
-            best_start = start if start else best_start
-    if best_start is not None:
-        candidate = t[best_start:].strip()
-        if len(candidate) > 30:  # evita di buttare tutto per un falso positivo
-            t = candidate
-    # 3) Filtra le righe-appunto residue
-    kept = [ln for ln in t.split('\n') if not any(re.search(p, ln, re.IGNORECASE) for p in _INTERNAL_NOTE_PATTERNS)]
-    cleaned = '\n'.join(kept).strip()
-    # 4) Rimuovi blocchi duplicati/simili (Gemma spesso ripete la risposta)
-    cleaned = _dedup_similar_blocks(cleaned)
-    # 5) Sicurezza: se la pulizia ha rimosso TUTTO, torna l'originale
-    return cleaned if cleaned else (text or '').strip()
+            t = t[:idx].strip()
+
+    # 3. Filtra le righe di scratchpad e appunti
+    cleaned_lines = []
+    for line in t.split('\n'):
+        line_s = line.strip()
+        if not line_s:
+            cleaned_lines.append('')
+            continue
+        if _TRASH_RE.search(line_s):
+            continue
+        cleaned_lines.append(line)
+
+    t = '\n'.join(cleaned_lines).strip()
+    t = re.sub(r'\n{3,}', '\n\n', t)
+
+    # 4. Trova l'inizio del vero messaggio in italiano
+    paragraphs = [p.strip() for p in t.split('\n\n') if p.strip()]
+    if len(paragraphs) >= 2:
+        first_is_bullets_only = all(l.strip().startswith('*') or l.strip().startswith('-') for l in paragraphs[0].split('\n') if l.strip())
+        second_is_text_intro = not (paragraphs[1].strip().startswith('*') or paragraphs[1].strip().startswith('-'))
+        if first_is_bullets_only and second_is_text_intro:
+            paragraphs = paragraphs[1:]
+
+    # 5. Deduplicazione blocchi simili
+    import difflib
+    kept = []
+    for p in paragraphs:
+        is_dup = False
+        for i, k in enumerate(kept):
+            if difflib.SequenceMatcher(None, k.lower(), p.lower()).ratio() > 0.6:
+                if len(p) > len(k):
+                    kept[i] = p
+                is_dup = True
+                break
+        if not is_dup:
+            kept.append(p)
+
+    res = '\n\n'.join(kept).strip()
+    return res if len(res) > 10 else text.strip()
 # Context processor to expose current season and month
 @app.context_processor
 def utility_processor():

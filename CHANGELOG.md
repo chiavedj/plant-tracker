@@ -1,5 +1,12 @@
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.5.3] – 2025-08-26
+
+### Corretto
+- **Chatbot / Gemma 4: eliminazione totale dello scratchpad di ragionamento** — risolto il problema per cui Gemma continuava a mostrare sezioni `Persona:`, `App:`, `User's Plants:`, `Self-Correction` e blocchi duplicati prima della risposta vera
+
+
+
 ## [1.5.2] – 2025-08-26
 
 ### Corretto
