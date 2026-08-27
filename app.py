@@ -770,6 +770,21 @@ def dashboard():
         for v in sorted(_groups.values(), key=lambda x: x['name'].lower())
     ]
     
+    # Compiti standard / pendenti raggruppati per pianta (vista "Raggruppa" della bacheca)
+    _p_groups = {}
+    for t in pending_tasks:
+        g_name = t.plant.name if t.plant else 'Compiti Generali'
+        g_key = (g_name, t.plant.id if t.plant else None)
+        if g_key not in _p_groups:
+            _p_groups[g_key] = {'name': g_name, 'plant_id': (t.plant.id if t.plant else None), 'tasks': []}
+        _p_groups[g_key]['tasks'].append(t)
+    pending_groups = [
+        {'name': v['name'], 'plant_id': v['plant_id'], 'count': len(v['tasks']),
+         'has_watering': any(t.task_type == 'watering' for t in v['tasks']),
+         'tasks': v['tasks']}
+        for v in sorted(_p_groups.values(), key=lambda x: x['name'].lower())
+    ]
+    
     # Plants count
     plants_count = Plant.query.count()
     pending_count = Task.query.filter_by(status='pending').count()
@@ -785,6 +800,7 @@ def dashboard():
                            pending_count=pending_count,
                            plants=plants,
                            urgent_groups=urgent_groups,
+                           pending_groups=pending_groups,
                            weather=weather)
 
 

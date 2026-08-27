@@ -1,5 +1,14 @@
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.6.0] – 2025-08-26
+
+### Aggiunto
+- **Bacheca / Altre cose da fare raggruppabili per pianta**: aggiunto anche alla sezione "Altre cose da fare" l'interruttore *"Raggruppa per pianta"* / *"Elenca"*, identico a quello già presente per "In Evidenza"
+  - Card comprimibili per pianta con contatore compiti e badge `💧 Auto`
+  - Preferenza salvata separatamente nel browser (`localStorage.florae_pending_view`)
+
+
+
 ## [1.5.5] – 2025-08-26
 
 ### Corretto

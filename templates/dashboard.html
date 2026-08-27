@@ -232,13 +232,28 @@
         
         <!-- Left 2 Columns: Other Tasks list -->
         <div class="lg:col-span-2 space-y-4">
-            <h2 class="text-2xl font-bold text-stone-900 flex items-center space-x-2">
-                <i class="fa-solid fa-clipboard-list text-emerald-700"></i>
-                <span>Altre cose da fare</span>
-            </h2>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <h2 class="text-2xl font-bold text-stone-900 flex items-center space-x-2">
+                    <i class="fa-solid fa-clipboard-list text-emerald-700"></i>
+                    <span>Altre cose da fare</span>
+                </h2>
+                {% if pending_tasks %}
+                <div id="pending-view-toggle" class="flex items-center bg-white rounded-xl border border-stone-200 shadow-sm p-1 text-xs font-semibold">
+                    <button type="button" data-view="grouped" onclick="setPendingView('grouped')"
+                            class="px-3 py-1.5 rounded-lg transition-all flex items-center space-x-1.5">
+                        <i class="fa-solid fa-layer-group"></i><span>Raggruppa per pianta</span>
+                    </button>
+                    <button type="button" data-view="list" onclick="setPendingView('list')"
+                            class="px-3 py-1.5 rounded-lg transition-all flex items-center space-x-1.5">
+                        <i class="fa-solid fa-list"></i><span>Elenca</span>
+                    </button>
+                </div>
+                {% endif %}
+            </div>
 
             {% if pending_tasks %}
-                <div class="bg-white rounded-3xl border border-stone-200/80 shadow-sm divide-y divide-stone-100 overflow-hidden">
+                <!-- VISTA ELENCO COMPLETO -->
+                <div id="pending-list-view" class="bg-white rounded-3xl border border-stone-200/80 shadow-sm divide-y divide-stone-100 overflow-hidden">
                     {% for task in pending_tasks %}
                         <div class="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-stone-50/50 transition-colors">
                             <div class="flex items-start space-x-3.5">
@@ -271,6 +286,59 @@
                                 <a href="/task/delete/{{ task.id }}" class="text-stone-400 hover:text-rose-600 p-2 rounded-lg transition-colors">
                                     <i class="fa-solid fa-trash-can text-sm"></i>
                                 </a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <!-- VISTA RAGGRUPPATA PER PIANTA -->
+                <div id="pending-grouped-view" class="space-y-3">
+                    {% for group in pending_groups %}
+                        <div class="bg-white border-2 border-stone-200/80 hover:border-emerald-200 rounded-3xl shadow-sm transition-all overflow-hidden">
+                            <button type="button" onclick="togglePendingGroup('pg-{{ loop.index }}', this)"
+                                    class="w-full flex items-center justify-between gap-4 p-5 text-left">
+                                <div class="flex items-center space-x-3 min-w-0">
+                                    <div class="bg-emerald-50 text-emerald-700 p-2.5 rounded-xl flex-shrink-0">
+                                        <i class="fa-solid fa-seedling"></i>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <h3 class="font-bold text-stone-900 truncate">{{ group.name }}</h3>
+                                        <p class="text-xs text-stone-500">{{ group.count }} compit{{ 'o' if group.count == 1 else 'i' }} da fare</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2 flex-shrink-0">
+                                    {% if group.has_watering %}
+                                        <span class="text-sky-700 text-[10px] font-bold uppercase bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full">💧 Auto</span>
+                                    {% endif %}
+                                    <span class="bg-emerald-700 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full">{{ group.count }}</span>
+                                    <i class="fa-solid fa-chevron-down text-stone-400 transition-transform duration-200"></i>
+                                </div>
+                            </button>
+                            <div id="pg-{{ loop.index }}" class="hidden border-t border-stone-100 divide-y divide-stone-100 bg-stone-50/40">
+                                {% for task in group.tasks %}
+                                    <div class="px-5 py-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                        <div class="min-w-0">
+                                            <div class="flex items-center space-x-2 flex-wrap">
+                                                <h4 class="font-bold text-sm text-stone-900">{{ task.title }}</h4>
+                                                {% if task.task_type == 'watering' %}
+                                                    <span class="text-sky-700 text-[10px] font-bold uppercase bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full">💧 Auto</span>
+                                                {% endif %}
+                                            </div>
+                                            {% if task.description %}
+                                                <p class="text-xs text-stone-500 mt-1 leading-relaxed line-clamp-2 whitespace-pre-line">{{ task.description }}</p>
+                                            {% endif %}
+                                            <span class="inline-block mt-1.5 text-[10px] text-stone-600 font-bold bg-stone-100 px-2 py-0.5 rounded-lg">⏰ {{ task.due_date }}</span>
+                                        </div>
+                                        <div class="flex items-center space-x-2 justify-end md:flex-shrink-0">
+                                            <a href="/task/complete/{{ task.id }}" class="bg-stone-100 hover:bg-emerald-600 hover:text-white text-stone-700 font-semibold px-4 py-2.5 rounded-xl text-sm shadow-sm transition-all flex items-center space-x-1.5">
+                                                <i class="fa-solid fa-check"></i><span>Completa</span>
+                                            </a>
+                                            <a href="/task/delete/{{ task.id }}" class="text-stone-400 hover:text-rose-600 p-2 rounded-lg transition-colors" title="Elimina compito">
+                                                <i class="fa-solid fa-trash-can text-sm"></i>
+                                            </a>
+                                        </div>
+                                    </div>
+                                {% endfor %}
                             </div>
                         </div>
                     {% endfor %}
@@ -421,14 +489,42 @@
         });
         if (persist) localStorage.setItem('florae_urgent_view', mode);
     }
+
+    // Vista altre attività (standard/pending): raggruppata per pianta oppure elenco completo
+    function setPendingView(mode, persist = true) {
+        const listView = document.getElementById('pending-list-view');
+        const groupedView = document.getElementById('pending-grouped-view');
+        if (!listView || !groupedView) return;
+        listView.classList.toggle('hidden', mode === 'grouped');
+        groupedView.classList.toggle('hidden', mode !== 'grouped');
+        document.querySelectorAll('#pending-view-toggle button').forEach(btn => {
+            const active = btn.dataset.view === mode;
+            btn.classList.toggle('bg-emerald-700', active);
+            btn.classList.toggle('text-white', active);
+            btn.classList.toggle('shadow', active);
+            btn.classList.toggle('text-stone-500', !active);
+        });
+        if (persist) localStorage.setItem('florae_pending_view', mode);
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         if (document.getElementById('urgent-view-toggle')) {
             setUrgentView(localStorage.getItem('florae_urgent_view') || 'grouped', false);
+        }
+        if (document.getElementById('pending-view-toggle')) {
+            setPendingView(localStorage.getItem('florae_pending_view') || 'grouped', false);
         }
     });
 
     // Apri/chiudi un gruppo di compiti per pianta
     function toggleUrgentGroup(groupId, btn) {
+        const body = document.getElementById(groupId);
+        body.classList.toggle('hidden');
+        const chevron = btn.querySelector('.fa-chevron-down');
+        chevron.style.transform = body.classList.contains('hidden') ? '' : 'rotate(180deg)';
+    }
+
+    function togglePendingGroup(groupId, btn) {
         const body = document.getElementById(groupId);
         body.classList.toggle('hidden');
         const chevron = btn.querySelector('.fa-chevron-down');
