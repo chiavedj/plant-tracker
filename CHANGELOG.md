@@ -1,5 +1,16 @@
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.6.2] – 2025-08-26
+
+### Corretto
+- **Chatbot/Gemma: estrazione definitiva della risposta finale** — nuovo algoritmo a segmenti:
+  - la risposta viene divisa in blocchi e ogni blocco classificato come "risposta italiana" o "appunto interno"
+  - i blocchi sporchi vengono comunque analizzati: se contengono la risposta italiana in coda, questa viene recuperata
+  - si parte dall'ultimo blocco italiano e si risale all'indietro finché la sequenza è contigua: i blocchi di ragionamento separano sempre, quindi il confine è netto
+  - testato su tutti i 4 output reali leakati dall'utente: estrazione al 100% in tutti i casi
+
+
+
 ## [1.6.1] – 2025-08-26
 
 ### Corretto

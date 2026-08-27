@@ -291,73 +291,85 @@ def send_telegram(message):
 
 # --- PULIZIA RISPOSTE CHAT (modelli come Gemma "pensano ad alta voce") ---
 
+# Parole italiane usate per riconoscere le righe della risposta vera
 _IT_WORDS_DETECT = {
-    'il', 'lo', 'la', 'i', 'gli', 'le', 'un', 'uno', 'una', 'di', 'a', 'da', 'in', 'con', 'su',
-    'per', 'tra', 'fra', 'e', 'ed', 'o', 'se', 'non', 'che', 'chi', 'come', 'dove', 'perché',
-    'quando', 'anche', 'ancora', 'più', 'meno', 'molto', 'poco', 'tutto', 'sono', 'è', 'siamo',
-    'hanno', 'ho', 'ha', 'terreno', 'terra', 'pianta', 'piante', 'acqua', 'annaffia', 'annaffiare',
-    'innaffia', 'innaffiare', 'umido', 'asciutto', 'radici', 'foglie', 'vaso', 'sottovasi', 'consiglio',
-    'oggi', 'sempre', 'prima', 'procedi', 'così', 'dati', 'ciao', 'ecco', 'decidere',
-    'risultano', 'varietà', 'gestire', 'regolarmente', 'nebulizza', 'controlla', 'queste', 'priorità'
+    'il','lo','la','i','gli','le','un','uno','una','di','a','da','in','con','su','per','tra','fra','e','ed','o','se','non','che','chi','come','dove','perché','quando','anche','ancora','più','meno','molto','poco','tutto','sono','è','siamo','hanno','ho','ha','terreno','terra','pianta','piante','acqua','annaffia','annaffiare','innaffia','innaffiare','umido','asciutto','asciutti','radici','foglie','vaso','sottovasi','consiglio','oggi','sempre','prima','procedi','così','dati','ciao','ecco','decidere','risultano','varietà','controlla','queste','priorità','dipende','migliore','evita','bagnare','mantieni','leggermente','ristagni','argentee','grigio','spesso','esagerare','collezione','umidità','frequente','moderato','sporadico','ricorda','speciale','caso'
 }
 
+# Parole/frasi che indicano appunti interni del modello
+_META_KEYWORDS = [
+    'persona:', 'role:', 'app:', 'goal:', 'constraint', 'strict output', 'output rule',
+    'format:', 'language:', 'style:', 'input:', 'user question', "user's plants",
+    'user plants', 'since the', 'the user is asking', "i don't have", 'i have to',
+    'i need to', 'i cannot', 'general watering rule', 'grouping by needs',
+    'high water', 'moderate:', 'low water', 'low/dry', 'practical check',
+    'greeting:', 'main advice', 'guidance:', 'categorized', 'specific groupings',
+    'check soil first', 'general rule:', 'ensure no', 'keep it under',
+    'bullet points', 'word count', 'drafting', 'final polish', 'self-correction',
+    'italian?', 'concise?', 'friendly', 'used user', 'no preamble',
+    'based on user', 'option ', 'instruction:', 'the user has', 'wait,',
+    'hmm,', 'my plan', 'first,', 'second,',
+]
+
+def _italian_line(line):
+    """True se la riga è testo discorsivo italiano (non bullet, non intestazione)."""
+    ls = line.strip()
+    if not ls or ls.startswith(('*','-','#','>')):
+        return False
+    words = re.findall(r"[a-zA-Zàèéìòù']+", ls.lower())
+    return sum(1 for w in words if w in _IT_WORDS_DETECT) >= 2
+
+def _block_segments(block):
+    """Scompagna un blocco in segmenti ('ital', testo) / ('meta', testo).
+    Se un blocco contiene meta-appunti SEGUIDI dalla risposta italiana, la recupera."""
+    b = block.strip()
+    lower = b.lower()
+    lines = b.split('\n')
+    last_it = -1
+    for i, l in enumerate(lines):
+        if _italian_line(l):
+            last_it = i
+    has_meta = any(k in lower for k in _META_KEYWORDS)
+    if not has_meta:
+        return [('ital', b)]
+    if last_it == -1:
+        return [('meta', b)]
+    head = '\n'.join(lines[:last_it]).strip()
+    tail = '\n'.join(lines[last_it:]).strip()
+    segs = []
+    if head:
+        segs.append(('meta', head))
+    if tail:
+        segs.append(('ital', tail))
+    return segs
+
 def clean_chat_reply(text):
-    """Estrae in modo deterministico e al 100% solo ed esclusivamente la risposta finale in italiano,
-    scartando qualsiasi scratchpad, bozza o planning in inglese generato da Gemma."""
+    """Estrae SOLO la risposta finale in italiano.
+    Gemma mette la risposta vera sempre alla FINE del messaggio, dopo lo scratchpad;
+    quindi si parte dall'ultimo blocco italiano e si risale finché la sequenza è contigua.
+    I blocchi di ragionamento separano sempre (appunti tipo '* Italian? Yes.'), quindi
+    il confine è netto e deterministico."""
     t = (text or '').strip()
     if not t:
         return t
-
-    # 1. Rimuovi tag think e note sul conteggio parole
     t = re.sub(r'<think>[\s\S]*?</think>', '', t, flags=re.IGNORECASE).strip()
     t = re.sub(r'\(Word count[^\)]*\)', '', t, flags=re.IGNORECASE)
 
-    # 2. Taglia marcatori di self-correction a fine risposta
-    for cut in ['*Self-Correction', 'Self-Correction during']:
-        idx = t.find(cut, 100)
-        if idx != -1:
-            t = t[:idx].strip()
+    blocks = [b.strip() for b in t.split('\n\n') if b.strip()]
+    segs = []
+    for b in blocks:
+        segs.extend(_block_segments(b))
 
-    # 3. Se c'è un marcatore esplicito di bozza finale pulita, prendi da lì
-    for f_mark in ['*Final Polish:*', 'Final Polish:', '**Final Polish:**']:
-        idx = t.rfind(f_mark)
-        if idx != -1:
-            t = t[idx + len(f_mark):].strip()
-            break
-
-    lines = t.split('\n')
-    start_line_idx = -1
-
-    # 4. Trova la prima riga discorsiva in italiano (non un punto elenco o intestazione di prompt)
-    for i, line in enumerate(lines):
-        line_clean = line.strip()
-        if not line_clean:
-            continue
-
-        # Salta punti elenco, titoli e intestazioni di prompt
-        if line_clean.startswith(('*', '-', '#', '>')) or any(line_clean.lower().startswith(k) for k in [
-            'persona:', 'role:', 'app:', 'user:', 'since ', 'context:', '*drafting:', 'drafting:'
-        ]):
-            continue
-
-        words = re.findall(r"[a-zA-Zàèéìòù']+", line_clean.lower())
-        it_count = sum(1 for w in words if w in _IT_WORDS_DETECT)
-        if it_count >= 2:
-            start_line_idx = i
-            break
-
-    if start_line_idx != -1:
-        res = '\n'.join(lines[start_line_idx:]).strip()
-        return res
-
-    # 5. Fallback: filtra le righe che contengono parole chiave di scratchpad
-    res_lines = []
-    scratchpad_kws = ['persona:', 'role:', 'app:', 'user:', 'since the', 'context:', 'drafting:', 'word count', 'goal:', 'constraints:']
-    for l in lines:
-        if any(k in l.lower() for k in scratchpad_kws):
-            continue
-        res_lines.append(l)
-    return '\n'.join(res_lines).strip()
+    # Risali dall'ultimo segmento italiano, estendi all'indietro finché contiguo
+    end = len(segs) - 1
+    while end >= 0 and segs[end][0] != 'ital':
+        end -= 1
+    if end < 0:
+        return t  # niente italiano riconosciuto: lascia il testo originale
+    start = end
+    while start > 0 and segs[start - 1][0] == 'ital':
+        start -= 1
+    return '\n\n'.join(s[1] for s in segs[start:end + 1]).strip()
 # Context processor to expose current season and month
 @app.context_processor
 def utility_processor():
