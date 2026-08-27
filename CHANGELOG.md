@@ -1,5 +1,16 @@
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.6.1] – 2025-08-26
+
+### Corretto
+- **Chatbot/Gemma: rimossa la causa radice dello scratchpad** — le meta-istruzioni del prompt di sistema ("mostra SOLO la risposta", "MAI ragionamento") venivano rilette e IMITATE da Gemma, che generava proprio quel tipo di appunti. Ora:
+  - il prompt è naturale e conversazionale, senza comandi imitabili
+  - per i modelli Google si usa il **priming conversazionale** (few-shot): un esempio di domanda/risposta pulita insegna a Gemma il formato esatto da seguire
+  - la cronologia della chat viene ripulita prima di essere rispedita al modello
+  - `clean_chat_reply` resta come retelia di sicurezza
+
+
+
 ## [1.6.0] – 2025-08-26
 
 ### Aggiunto

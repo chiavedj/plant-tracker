@@ -1274,13 +1274,10 @@ def settings():
 # --- CHAT COL BOTANICO IA ---
 
 CHAT_SYSTEM_PROMPT = (
-    "Sei Florae Bot, un esperto agronomo e botanico virtuale dentro l'app Florae di gestione piante. "
-    "Rispondi SEMPRE in italiano, in modo pratico e conciso (max 150 parole salvo richiesta diversa). "
-    "Usa elenchi puntati per i consigli operativi. Se la domanda riguarda una pianta dell'utente, "
-    "basa la risposta sui suoi dati reali qui sotto.\n"
-    "IMPORTANTISSIMO: mostra SOLO la risposta finale all'utente. Non scrivere MAI il tuo ragionamento "
-    "interno, le opzioni che stai valutando, appunti in inglese o testo prima/dopo la risposta. "
-    "Nessun preambolo tipo 'Ecco la risposta'. Solo la risposta pulita.\n\n"
+    "Sei Florae Bot, il botanico di fiducia dell'app Florae. "
+    "Parli con l'utente in italiano, con tono amichevole e pratico. "
+    "Le tue risposte sono brevi (massimo 150 parole) e usano elenchi puntati per i consigli operativi. "
+    "Conosci le piante dell'utente elencate qui sotto e usi questi dati reali nelle risposte."
 )
 
 def _plants_context():
@@ -1331,18 +1328,26 @@ def chatbot_send():
         else:
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel(model_id)
-            contents = [{'role': ('model' if h['role'] == 'assistant' else 'user'), 'parts': [clean_chat_reply(h['content']) if h['role'] == 'assistant' else h['content']]} for h in recent]
-            # Inietta le istruzioni e le piante nel messaggio più recente dell'utente
-            # con indicazione tassativa di rispondere SOLO in italiano senza preamboli
-            ctx = (
-                f"{system_prompt}\n"
-                "Istruzione finale per questa domanda: Rispondi DIRETTAMENTE in italiano con la sola risposta finale. "
-                "Non scrivere MAI 'Persona:', 'Role:', 'Goal:', né alcun testo in inglese.\n---\n"
+            # Gemma non ha ruolo di sistema e imita ciò che vede: invece di comandi
+            # meta (che riscrive nello scratchpad!), usiamo un PRIMING CONVERSAZIONALE:
+            # un esempio di domanda/risposta pulita da cui il modello prende il ritmo
+            seed_user = (
+                f"{system_prompt}\n\n"
+                f"Domanda di esempio: Devo innaffiare le mie piante oggi?\n\n"
+                f"Come rispondi tu (nota lo stile: diretto, italiano, solo la risposta):"
             )
-            if contents and contents[-1]['role'] == 'user':
-                contents[-1]['parts'][0] = ctx + str(contents[-1]['parts'][0])
-            elif contents and contents[0]['role'] == 'user':
-                contents[0]['parts'][0] = ctx + str(contents[0]['parts'][0])
+            seed_model = (
+                "Controlla il terreno con il dito: se i primi 2-3 cm sono asciutti, è ora di innaffiare. "
+                "Per le piante con annaffiatura programmata, segui la bacheca."
+            )
+            contents = [
+                {'role': 'user', 'parts': [seed_user]},
+                {'role': 'model', 'parts': [seed_model]},
+            ]
+            for h in recent:
+                role = 'model' if h['role'] == 'assistant' else 'user'
+                text_content = clean_chat_reply(h['content']) if h['role'] == 'assistant' else h['content']
+                contents.append({'role': role, 'parts': [text_content]})
             response = model.generate_content(contents)
             return response.text.strip()
     
