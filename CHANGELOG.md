@@ -1,5 +1,12 @@
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.5.4] – 2025-08-26
+
+### Corretto
+- **Chatbot / Gemma 4: estrazione deterministica della risposta italiana** — rimpiazzato l'approccio regex precedente con un parser per lingua che individua esattamente il punto in cui inizia la risposta reale in italiano, eliminando al 100% qualsiasi scratchpad, bozza o planning in inglese
+
+
+
 ## [1.5.3] – 2025-08-26
 
 ### Corretto

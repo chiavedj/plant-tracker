@@ -291,68 +291,75 @@ def send_telegram(message):
 
 # --- PULIZIA RISPOSTE CHAT (modelli come Gemma "pensano ad alta voce") ---
 
-_TRASH_RE = re.compile(
-    r'(\b(Persona|App|Goal|Constraints?|Input|Strict Output|Output Rule|Format|Language|Style|User\'s Plants|User Question|User Prompt)\b\s*:|'
-    r'\b(Since the prompt|High water|Moderate/Regular|Low water|Greeting|Guidance|Categorized list|No preambles|Based on user)\b|'
-    r'\b(Italian\?|Concise\?|Bullet points\?|Word count|Drafting|Final Polish|Self-Correction)\b)',
-    re.IGNORECASE
+_IT_WORDS = set([
+    'per', 'se', 'oggi', 'del', 'della', 'dei', 'delle', 'con', 'un', 'una', 'uno',
+    'solo', 'i', 'gli', 'le', 'la', 'il', 'di', 'da', 'in', 'su', 'tra', 'fra',
+    'terra', 'terreno', 'piante', 'pianta', 'innaffia', 'innaffiare', 'annaffia',
+    'annaffiare', 'così', 'non', 'avendo', 'e', 'ed', 'sono', 'queste', 'seguendo',
+    'linee', 'guida', 'sempre', 'prima', 'procedi', 'controlla', 'radici', 'asciutto',
+    'asciutti', 'asciutta', 'asciutte', 'umido', 'umidi', 'umida', 'frequente',
+    'moderato', 'sporadico', 'ricorda', 'evitare', 'sottovasi', 'ciao', 'come', 'posso',
+    'aiutarti', 'foglie', 'vaso', 'sole', 'luce', 'acqua', 'concime', 'cura', 'cure'
+])
+
+_SCRATCHPAD_PREFIXES = (
+    '* role:', '* context:', '* the user', '* user', '* general',
+    '* check', '* ensure', '* keep', '* group', '* orchid', '* moderate',
+    '* low', '* special', '* high', '* guidance', '* greeting',
+    '* no preambles', '* based on', '* drafting', '* final polish',
+    '* self-correction', 'persona:', 'app:', 'user question:',
+    'user prompt:', 'since the prompt', 'user persona:', 'role:', 'context:'
 )
 
 def clean_chat_reply(text):
-    """Rimuove il ragionamento interno leakato dai modelli (es. Gemma),
-    tenendo solo ed esclusivamente la risposta finale in italiano."""
+    """Estrae al 100% SOLO ed esclusivamente la risposta finale in italiano,
+    scartando qualsiasi scratchpad/ragionamento in inglese generato da modelli come Gemma."""
     t = (text or '').strip()
     if not t:
         return t
 
-    # 1. Rimuovi tag think o note word count
+    # 1. Rimuovi tag think e note tra parentesi
     t = re.sub(r'<think>[\s\S]*?</think>', '', t, flags=re.IGNORECASE).strip()
     t = re.sub(r'\(Word count[^\)]*\)', '', t, flags=re.IGNORECASE)
 
-    # 2. Se c'è un blocco "*Self-Correction" o "*Drafting:" dopo la prima metà, taglia
-    for marker in ['*Self-Correction', 'Self-Correction', '*Drafting:*']:
-        idx = t.find(marker, 100)
-        if idx != -1:
-            t = t[:idx].strip()
+    # 2. Dividi in righe per trovare il punto esatto di inizio della vera risposta italiana
+    lines = t.split('\n')
+    start_idx = -1
 
-    # 3. Filtra le righe di scratchpad e appunti
-    cleaned_lines = []
-    for line in t.split('\n'):
-        line_s = line.strip()
-        if not line_s:
-            cleaned_lines.append('')
+    for i, line in enumerate(lines):
+        line_clean = line.strip().lower()
+        if not line_clean:
             continue
-        if _TRASH_RE.search(line_s):
+
+        # Salta righe di scratchpad evidenti
+        if any(line_clean.startswith(p) for p in _SCRATCHPAD_PREFIXES):
             continue
-        cleaned_lines.append(line)
 
-    t = '\n'.join(cleaned_lines).strip()
-    t = re.sub(r'\n{3,}', '\n\n', t)
+        # Conta parole italiane nella riga
+        words = re.findall(r"[a-zA-Zàèéìòù']+", line.lower())
+        it_count = sum(1 for w in words if w in _IT_WORDS)
 
-    # 4. Trova l'inizio del vero messaggio in italiano
-    paragraphs = [p.strip() for p in t.split('\n\n') if p.strip()]
-    if len(paragraphs) >= 2:
-        first_is_bullets_only = all(l.strip().startswith('*') or l.strip().startswith('-') for l in paragraphs[0].split('\n') if l.strip())
-        second_is_text_intro = not (paragraphs[1].strip().startswith('*') or paragraphs[1].strip().startswith('-'))
-        if first_is_bullets_only and second_is_text_intro:
-            paragraphs = paragraphs[1:]
+        # Se la riga contiene parole italiane e non è un'intestazione in inglese
+        if it_count >= 2 and not line.strip().startswith(('* Role', '* Context', '* User', 'Persona:', 'Role:')):
+            start_idx = i
+            break
 
-    # 5. Deduplicazione blocchi simili
-    import difflib
-    kept = []
-    for p in paragraphs:
-        is_dup = False
-        for i, k in enumerate(kept):
-            if difflib.SequenceMatcher(None, k.lower(), p.lower()).ratio() > 0.6:
-                if len(p) > len(k):
-                    kept[i] = p
-                is_dup = True
-                break
-        if not is_dup:
-            kept.append(p)
+    if start_idx != -1:
+        # Prendi tutte le righe dal punto di inizio in poi
+        content = '\n'.join(lines[start_idx:]).strip()
 
-    res = '\n\n'.join(kept).strip()
-    return res if len(res) > 10 else text.strip()
+        # Taglia eventuali blocchi di self-correction o bozze ripetute alla fine
+        for cut_marker in ['*Self-Correction', 'Self-Correction during', '*Drafting:']:
+            c_idx = content.find(cut_marker)
+            if c_idx != -1:
+                content = content[:c_idx].strip()
+
+        # Rimuovi eventuali righe finali spezzate o orfane
+        content_lines = [l for l in content.split('\n') if not any(l.strip().lower().startswith(p) for p in _SCRATCHPAD_PREFIXES)]
+        cleaned = '\n'.join(content_lines).strip()
+        return cleaned if len(cleaned) > 10 else t
+
+    return t
 # Context processor to expose current season and month
 @app.context_processor
 def utility_processor():
