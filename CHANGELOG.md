@@ -1,5 +1,10 @@
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.6.4] – 2025-08-29
+
+### Aggiunto
+- **Badge versione visibile nel footer** di tutte le pagine: accanto al logo "Florae Tracker" ora appare la versione corrente dell'app (es. `v1.6.4`), così è sempre evidente quale release gira sul server senza comandi da terminale
+
 ## [1.6.3] – 2025-08-29
 
 ### Aggiunto

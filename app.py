@@ -11,7 +11,7 @@ import time
 import requests
 import google.generativeai as genai
 
-__version__ = "1.6.3"  # Fonte unica della versione (vedi CHANGELOG.md)
+__version__ = "1.6.4"  # Fonte unica della versione (vedi CHANGELOG.md)
 
 app = Flask(__name__)
 app.secret_key = "plant_tracker_super_secret_key"
@@ -393,7 +393,8 @@ def utility_processor():
     return dict(
         current_season=season_name, 
         current_season_attr=season_attr, 
-        current_month=get_italian_month()
+        current_month=get_italian_month(),
+        app_version=__version__
     )
 
 # Helper for AI Analysis
