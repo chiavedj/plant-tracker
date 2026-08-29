@@ -1,5 +1,15 @@
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.6.3] – 2025-08-29
+
+### Aggiunto
+- **Favicon del sito**: il logo Florae appare ora come icona nel browser e come apple-touch-icon (180×180) quando l'app viene aggiunta alla home screen di iPhone/iPad
+  - `static/img/favicon-32x32.png` e `static/img/apple-touch-icon.png` generate dal logo originale
+  - collegati nel `<head>` di `base.html`, quindi disponibili su tutte le pagine
+
+### Corretto
+- La costante `__version__` in `app.py` risultava ferma a 1.5.3 nonostante i rilasci successivi
+
 ## [1.6.2] – 2025-08-26
 
 ### Corretto
