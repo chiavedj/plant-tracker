@@ -11,7 +11,7 @@ import time
 import requests
 import google.generativeai as genai
 
-__version__ = "1.6.4"  # Fonte unica della versione (vedi CHANGELOG.md)
+__version__ = "1.7.0"  # Fonte unica della versione (vedi CHANGELOG.md)
 
 app = Flask(__name__)
 app.secret_key = "plant_tracker_super_secret_key"
@@ -817,6 +817,60 @@ def dashboard():
                            weather=weather)
 
 
+# --- CONSIGLI STAGIONALI IN BASE ALLA SPECIE ---
+# Il vecchio fallback applicava lo stesso testo identico a tutte le piante.
+# Ora i consigli default vengono scelti in base alla categoria botanica.
+
+_OLD_GENERIC_DEFAULTS = {
+    'spring_care': "Ricomincia a concimare una volta al mese. Innaffia con più regolarità.",
+    'summer_care': "Innaffia frequentemente, controllando che il terreno non si secchi del tutto. Proteggi dai raggi solari troppo intensi.",
+    'autumn_care': "Riduci gradualmente le annaffiature. Sospendi le concimazioni. Riporta in casa se la pianta soffre il freddo.",
+    'winter_care': "Innaffia solo sporadicamente. Assicurati che la stanza sia luminosa e lontana dai termosifoni."
+}
+
+_SEASONAL_CARE_CATEGORIES = [
+    # (parole chiave, consigli)
+    (["rosmarino", "salvia", "menta", "lavanda", "basilico", "prezzemolo", "origano", "magiorana", "aromatica", "erp", "ceriolo"], {
+        "spring_care": "Riprendi annaffiature regolari e una concimazione mensile leggera. Raccogli le foglie più giovani per stimolare la crescita.",
+        "summer_care": "Innaffia al mattino senza bagnare le foglie. Se va in fiore taglia gli steli fiorali: le erbe perdono aroma dopo la fioritura.",
+        "autumn_care": "Riduci gradualmente le annaffiature e sospendi le concimazioni. Raccogli gli ultimi rametti prima delle prime gelate.",
+        "winter_care": "Mantieni il terreno poco umido e la pianta in un luogo luminoso e riparato dal freddo. Nessuna concimazione."
+    }),
+    (["cactus", "grassa", "succul", "sansevieria", "crassula", "echeveria", "aloe", "fantasma", "kalanchoe", "sedum", "agave", "haworthia"], {
+        "spring_care": "Riprendi le annaffiature solo a terreno completamente asciutto. Inizia una concimazione specifica per succulente una volta al mese.",
+        "summer_care": "Annaffia solo quando il terreno è asciutto. Ripara dai raggi solari più intensi delle ore centrali e garantisci buona ventilazione.",
+        "autumn_care": "Dirada molto le annaffiature e sospendi le concimazioni: con le giornate più corte il terreno resta umido a lungo.",
+        "winter_care": "Innaffia una volta al mese o meno. Mantieni temperature sopra i 5-8°C in ambiente luminoso e asciutto."
+    }),
+    (["monstera", "pothos", "potos", "filodendro", "dracena", "orchidea", "ficus", "palma", "felce", "calathea", "spatifillo", "sgambo", "croton", "dieffenbachia"], {
+        "spring_care": "Inizia una concimazione quindicinale e aumenta gradualmente le annaffiature. È il momento ideale per il rinvaso.",
+        "summer_care": "Innaffia con regolarità mantenendo il terreno fresco. Aumenta l'umidità fogliare e ripara dal sole diretto.",
+        "autumn_care": "Riduci le annaffiature e sospendi il concime. Sposta la pianta lontano da finestre fredde e correnti d'aria.",
+        "winter_care": "Annaffia solo quando i primi centimetri di terriccio sono asciutti. Allontana dai termosifoni e vaporizza se l'aria è secca."
+    }),
+    (["ciclamino", "viola", "margherita", "ortensia", "dalia", "tulipano", "geranio", "campanule", "zinnia", "tagete", "fresia", "giacinto", "narciso", "petunia", "begonia"], {
+        "spring_care": "Concima quindicinalmente per stimolare nuovi boccioli e mantieni il terreno fresco senza ristagni d'acqua.",
+        "summer_care": "Elimina i fiori appassiti e innaffia regolarmente nelle ore fresche. Proteggi i petali più delicati dal sole intenso.",
+        "autumn_care": "Riduci le annaffiature con l'arrivo del fresco. Rimuovi le parti secche e prepara la pianta alla pausa vegetativa.",
+        "winter_care": "Annaffia pochissimo e proteggi dalle gelate. Le bulbose possono rimanere nel terreno e apprezzano il freddo per rifiorire."
+    }),
+    (["limone", "arancio", "mandarino", "ulivo", "vite", "ibisco", "acero", "melograno", "larice", "olivo", "albero", "rosa", "gelsomino"], {
+        "spring_care": "Riprendi concimazione e annaffiature regolari. È il periodo ideale per potature leggere e rinvaso.",
+        "summer_care": "Annaffia abbondantemente nei periodi caldi, verifica la presenza di parassiti sulle foglie e proteggi i frutti in formazione.",
+        "autumn_care": "Dirada le annaffiature, sospendi il concime e porta in riparo le specie più sensibili al freddo.",
+        "winter_care": "Annaffia solo sporadicamente. Proteggi dalle gelate con telo o spostando in un luogo luminoso e riparato."
+    })
+]
+
+def seasonal_care_defaults(name="", species=""):
+    """Consigli stagionali di default in base alla specie della pianta.
+    Restituisce un dict con spring_care, summer_care, autumn_care, winter_care."""
+    text = f"{(name or '')} {(species or '')}".lower()
+    for keywords, care in _SEASONAL_CARE_CATEGORIES:
+        if any(k in text for k in keywords):
+            return dict(care)
+    return dict(_OLD_GENERIC_DEFAULTS)
+
 @app.route('/plants')
 def list_plants():
     plants = Plant.query.order_by(Plant.name).all()
@@ -834,10 +888,12 @@ def add_plant():
     watering = request.form.get('watering')
     care = request.form.get('care')
     
-    spring_care = (request.form.get('spring_care') or '').strip() or "Ricomincia a concimare una volta al mese. Innaffia con più regolarità."
-    summer_care = (request.form.get('summer_care') or '').strip() or "Innaffia frequentemente, controllando che il terreno non si secchi del tutto. Proteggi dai raggi solari troppo intensi."
-    autumn_care = (request.form.get('autumn_care') or '').strip() or "Riduci gradualmente le annaffiature. Sospendi le concimazioni. Riporta in casa se la pianta soffre il freddo."
-    winter_care = (request.form.get('winter_care') or '').strip() or "Innaffia solo sporadicamente. Assicurati che la stanza sia luminosa e lontana dai termosifoni."
+    # Consigli stagionali di default in base alla specie (non più testo generico identico per tutte)
+    defaults = seasonal_care_defaults(name, species)
+    spring_care = (request.form.get('spring_care') or '').strip() or defaults['spring_care']
+    summer_care = (request.form.get('summer_care') or '').strip() or defaults['summer_care']
+    autumn_care = (request.form.get('autumn_care') or '').strip() or defaults['autumn_care']
+    winter_care = (request.form.get('winter_care') or '').strip() or defaults['winter_care']
     
     # Frequenza innaffiatura automatica (giorni, opzionale)
     try:
@@ -1016,10 +1072,7 @@ def move_to_plants(id):
         exposure="Da definire",
         watering="Da definire",
         care=f"Note dalla wishlist: {item.notes if item.notes else 'Nessuna nota'}",
-        spring_care="Ricomincia a concimare una volta al mese. Innaffia con più regolarità.",
-        summer_care="Innaffia frequentemente, controllando che il terreno non si secchi del tutto. Proteggi dai raggi solari troppo intensi.",
-        autumn_care="Riduci gradualmente le annaffiature. Sospendi le concimazioni. Riporta in casa se la pianta soffre il freddo.",
-        winter_care="Innaffia solo sporadicamente. Assicurati che la stanza sia luminosa e lontana dai termosifoni."
+        **seasonal_care_defaults(item.name, item.species)
     )
     
     db.session.add(new_plant)
@@ -1175,10 +1228,7 @@ def apply_diagnosis():
             watering=watering_rules or "Vedi diagnosi",
             care=f"Diagnosi IA: {problem}\n\nSoluzione:\n{solution}",
             image_url=image_url,
-            spring_care="Ricomincia a concimare una volta al mese. Innaffia con più regolarità.",
-            summer_care="Innaffia frequentemente, controllando che il terreno non si secchi del tutto. Proteggi dai raggi solari troppo intensi.",
-            autumn_care="Riduci gradualmente le annaffiature. Sospendi le concimazioni. Riporta in casa se la pianta soffre il freddo.",
-            winter_care="Innaffia solo sporadicamente. Assicurati che la stanza sia luminosa e lontana dai termosifoni."
+            **seasonal_care_defaults(plant_name, species)
         )
         db.session.add(plant)
         db.session.flush() # populate ID for the task creation
@@ -1441,6 +1491,28 @@ if __name__ == '__main__':
                         conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}"))
                         print(f"Migrazione: aggiunta colonna {table}.{col_name}")
             conn.commit()
+        
+        # Migrazione 1.7.0: le piante create prima avevano tutte lo stesso testo
+        # generico nei campi stagionali. Se i campi corrispondono esattamente al
+        # vecchio default, li rigeneriamo in base alla specie della pianta.
+        regenerated = 0
+        for p in Plant.query.all():
+            new_care = None
+            if p.autumn_care == _OLD_GENERIC_DEFAULTS['autumn_care']:
+                new_care = seasonal_care_defaults(p.name, p.species)
+                # Sovrascrive solo i campi che contengono ancora il vecchio testo generico,
+                # preservando eventuali personalizzazioni dell'utente
+                if p.spring_care == _OLD_GENERIC_DEFAULTS['spring_care']:
+                    p.spring_care = new_care['spring_care']
+                if p.summer_care == _OLD_GENERIC_DEFAULTS['summer_care']:
+                    p.summer_care = new_care['summer_care']
+                p.autumn_care = new_care['autumn_care']
+                if p.winter_care == _OLD_GENERIC_DEFAULTS['winter_care']:
+                    p.winter_care = new_care['winter_care']
+                regenerated += 1
+        if regenerated:
+            db.session.commit()
+            print(f"Migrazione: rigenerati i consigli stagionali di {regenerated} piante in base alla specie")
         
         # Populate with some default plants if db is empty
         if Plant.query.count() == 0:

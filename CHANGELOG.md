@@ -1,5 +1,13 @@
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.7.0] – 2025-08-29
+
+### Modificato
+- **Guida stagionale nella dashboard ora differenziata per specie**: la sezione "Cura in Autunno" (e le altre stagioni) non mostra più lo stesso identico testo per tutte le piante
+  - Nuovo generatore di consigli stagionali in base alla categoria botanica: **aromatiche, succulente/piante grasse, tropicali/fogliame, fioriture, alberi/arbusti**
+  - Applicato in tutti i punti di creazione pianta: aggiunta manuale, acquisto da wishlist, creazione da diagnosi IA
+  - Migrazione automatica all'avvio: le piante esistenti con il vecchio testo generico identico vengono rigenerate in base alla specie (solo i campi non personalizzati)
+
 ## [1.6.4] – 2025-08-29
 
 ### Aggiunto
