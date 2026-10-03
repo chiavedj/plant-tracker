@@ -1,5 +1,12 @@
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.7.1] – 2025-08-29
+
+### Aggiunto
+- **Guida stagionale raggruppata per categoria** nella dashboard: le piante della stessa categoria botanica (Aromatiche, Succulente e grasse, Tropicali/fogliame, Fioriture, Alberi/arbusti) sono ora accorpate in un'unica card con icona, contatore di piante e il consiglio stagionale della categoria
+  - Le piante appaiono come chip cliccabili nella relativa categoria
+  - Le piante con consigli **personalizzati** dall'utente continuano a essere mostrate singolarmente con il loro testo
+
 ## [1.7.0] – 2025-08-29
 
 ### Modificato

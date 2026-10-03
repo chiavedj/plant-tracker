@@ -11,7 +11,7 @@ import time
 import requests
 import google.generativeai as genai
 
-__version__ = "1.7.0"  # Fonte unica della versione (vedi CHANGELOG.md)
+__version__ = "1.7.1"  # Fonte unica della versione (vedi CHANGELOG.md)
 
 app = Flask(__name__)
 app.secret_key = "plant_tracker_super_secret_key"
@@ -805,6 +805,35 @@ def dashboard():
     # Simple list of all plants to show care tips for the current season
     plants = Plant.query.all()
     
+    # Guida stagionale raggruppata per categoria botanica: le piante con il
+    # consiglio default della categoria vengono accorpate; quelle con testo
+    # personalizzato dall'utente restano in vista individuale
+    month = datetime.now().month
+    if month in [3, 4, 5]: season_attr = 'spring_care'
+    elif month in [6, 7, 8]: season_attr = 'summer_care'
+    elif month in [9, 10, 11]: season_attr = 'autumn_care'
+    else: season_attr = 'winter_care'
+    
+    _cat_groups = {}
+    custom_plants = []
+    for p in plants:
+        label, icon = plant_category(p.name, p.species)
+        default_care = seasonal_care_defaults(p.name, p.species)[season_attr]
+        current_care = getattr(p, season_attr, None)
+        if current_care and current_care != default_care:
+            custom_plants.append(p)
+            continue
+        if label not in _cat_groups:
+            _cat_groups[label] = {'label': label, 'icon': icon, 'care': default_care, 'plants': []}
+        _cat_groups[label]['plants'].append(p.name)
+    
+    _order = {meta[0]: i for i, meta in enumerate(_CATEGORY_META)}
+    _order["Altre piante"] = len(_CATEGORY_META)
+    seasonal_groups = sorted(_cat_groups.values(), key=lambda g: _order.get(g['label'], 99))
+    for g in seasonal_groups:
+        g['count'] = len(g['plants'])
+    custom_plants.sort(key=lambda p: p.name.lower())
+    
     return render_template('dashboard.html', 
                            urgent_tasks=urgent_tasks, 
                            pending_tasks=pending_tasks, 
@@ -812,6 +841,8 @@ def dashboard():
                            plants_count=plants_count,
                            pending_count=pending_count,
                            plants=plants,
+                           seasonal_groups=seasonal_groups,
+                           custom_plants=custom_plants,
                            urgent_groups=urgent_groups,
                            pending_groups=pending_groups,
                            weather=weather)
@@ -870,6 +901,22 @@ def seasonal_care_defaults(name="", species=""):
         if any(k in text for k in keywords):
             return dict(care)
     return dict(_OLD_GENERIC_DEFAULTS)
+
+_CATEGORY_META = [
+    ("Aromatiche", "fa-mortar-pestle"),
+    ("Succulente e piante grasse", "fa-sun"),
+    ("Piante tropicali e da fogliame", "fa-leaf"),
+    ("Fioriture", "fa-spa"),
+    ("Alberi e arbusti", "fa-tree"),
+]
+
+def plant_category(name="", species=""):
+    """Restituisce (etichetta, icona) della categoria botanica della pianta."""
+    text = f"{(name or '')} {(species or '')}".lower()
+    for i, (keywords, _care) in enumerate(_SEASONAL_CARE_CATEGORIES):
+        if any(k in text for k in keywords):
+            return _CATEGORY_META[i]
+    return ("Altre piante", "fa-seedling")
 
 @app.route('/plants')
 def list_plants():

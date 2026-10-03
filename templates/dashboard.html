@@ -362,7 +362,25 @@
                 
                 {% if plants %}
                     <div class="divide-y divide-emerald-800/80 space-y-3">
-                        {% for plant in plants %}
+                        {% for g in seasonal_groups %}
+                            <div class="pt-3 first:pt-0">
+                                <div class="flex items-center justify-between">
+                                    <h4 class="font-serif font-bold text-white text-base flex items-center gap-2">
+                                        <i class="fa-solid {{ g.icon }} text-emerald-300"></i>{{ g.label }}
+                                    </h4>
+                                    <span class="text-[10px] bg-emerald-800 text-emerald-200 px-2 py-0.5 rounded-full">{{ g.count }} {{ 'pianta' if g.count == 1 else 'piante' }}</span>
+                                </div>
+                                <p class="text-xs text-stone-200 mt-1 leading-relaxed bg-emerald-950/40 p-2.5 rounded-lg border border-emerald-800/30">
+                                    {{ g.care }}
+                                </p>
+                                <div class="flex flex-wrap gap-1 mt-1.5">
+                                    {% for name in g.plants %}
+                                        <span class="text-[10px] bg-emerald-950/60 border border-emerald-800/50 text-stone-300 px-2 py-0.5 rounded-full">{{ name }}</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                        {% for plant in custom_plants %}
                             <div class="pt-3 first:pt-0">
                                 <h4 class="font-serif font-bold text-white text-base">{{ plant.name }}</h4>
                                 <p class="text-xs text-emerald-300 italic mb-1">{{ plant.species or 'Specie generica' }}</p>
