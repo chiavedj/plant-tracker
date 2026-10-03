@@ -25,8 +25,11 @@
                         {% if plant.image_url %}
                             <img src="{{ plant.image_url }}" alt="{{ plant.name }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
                         {% else %}
-                            <div class="w-full h-full bg-gradient-to-tr from-emerald-800/20 to-emerald-800/10 flex items-center justify-center">
-                                <i class="fa-solid fa-seedling text-6xl text-emerald-800/30"></i>
+                            {% set cat_label, cat_icon = plant_category(plant.name, plant.species) %}
+                            <div class="w-full h-full bg-gradient-to-tr from-emerald-100/70 via-stone-50 to-stone-100 flex flex-col items-center justify-center gap-2">
+                                <i class="fa-solid {{ cat_icon }} text-6xl text-emerald-800/20 group-hover:scale-110 transition-transform duration-500"></i>
+                                <span class="text-[10px] uppercase tracking-wider text-stone-400 font-semibold">{{ cat_label }}</span>
+                                <span class="text-[10px] text-stone-400 italic">Foto in arrivo…</span>
                             </div>
                         {% endif %}
                         <div class="absolute top-4 right-4 flex space-x-1">
@@ -292,8 +295,8 @@
                 if (data.image_url && !data.image_url.includes('placeholder')) {
                     document.getElementById('detail-img').src = data.image_url;
                 } else {
-                    // Set beautiful plant svg as data URI
-                    document.getElementById('detail-img').src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='%23059669'><path d='M512 64c0-17.7-14.3-32-32-32H384c-35.3 0-64 28.7-64 64V224H256V160c0-17.7-14.3-32-32-32H128c-35.3 0-64 28.7-64 64V384H32c-17.7 0-32 14.3-32 32s14.3 32 32 32H480c17.7 0 32-14.3 32-32s-14.3-32-32-32H448V96c0-17.7-14.3-32-32-32H384c-17.7 0-32 14.3-32 32v64H288V96c0-17.7-14.3-32-32-32H160c-17.7 0-32 14.3-32 32v64H96c0 17.7 14.3 32 32 32h64v64H96v64h96v64h32V160h64v64h32v64h32V96h64v128h32V64z'/></svg>";
+                    // Placeholder illustrato per piante senza foto
+                    document.getElementById('detail-img').src = '/static/img/placeholder.svg';
                 }
                 document.getElementById('detail-name').innerText = data.name;
                 document.getElementById('detail-mobile-name').innerText = data.name;

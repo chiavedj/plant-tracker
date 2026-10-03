@@ -1,5 +1,11 @@
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.7.2] – 2025-08-29
+
+### Aggiunto
+- **Placeholder illustrato per le piante senza foto** nella sezione "Le mie Piante": invece dell'icona generica, ogni card mostra l'**icona della categoria botanica** della pianta (Aromatiche, Succulente, Tropicali, Fioriture, Alberi) su sfondo sfumato, con la scritta "Foto in arrivo…"
+- Il **dettaglio pianta** ora usa il placeholder illustrato `placeholder.svg` invece dell'icona verde generica
+
 ## [1.7.1] – 2025-08-29
 
 ### Aggiunto
