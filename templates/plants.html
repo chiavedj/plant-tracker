@@ -22,11 +22,18 @@
                 <div class="bg-white rounded-3xl border border-stone-200/80 shadow-sm overflow-hidden hover:shadow-md transition-all duration-300 flex flex-col group">
                     <!-- Plant Image or Placeholder -->
                     <div class="relative h-56 bg-stone-100 overflow-hidden">
+                        {% set cat_label, cat_icon = plant_category(plant.name, plant.species) %}
                         {% if plant.image_url %}
                             <img src="{{ plant.image_url }}" alt="{{ plant.name }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                 onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden')">
-                            {% set cat_label, cat_icon = plant_category(plant.name, plant.species) %}
-                            <div class="hidden flex w-full h-full bg-gradient-to-tr from-emerald-100/70 via-stone-50 to-stone-100 flex-col items-center justify-center gap-2">
+                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+                            <!-- Fallback visibile solo se il file della foto non esiste più -->
+                            <div style="display:none" class="w-full h-full bg-gradient-to-tr from-emerald-100/70 via-stone-50 to-stone-100 flex-col items-center justify-center gap-2">
+                                <i class="fa-solid {{ cat_icon }} text-6xl text-emerald-800/20 group-hover:scale-110 transition-transform duration-500"></i>
+                                <span class="text-[10px] uppercase tracking-wider text-stone-400 font-semibold">{{ cat_label }}</span>
+                                <span class="text-[10px] text-stone-400 italic">Foto in arrivo…</span>
+                            </div>
+                        {% else %}
+                            <div class="w-full h-full bg-gradient-to-tr from-emerald-100/70 via-stone-50 to-stone-100 flex flex-col items-center justify-center gap-2">
                                 <i class="fa-solid {{ cat_icon }} text-6xl text-emerald-800/20 group-hover:scale-110 transition-transform duration-500"></i>
                                 <span class="text-[10px] uppercase tracking-wider text-stone-400 font-semibold">{{ cat_label }}</span>
                                 <span class="text-[10px] text-stone-400 italic">Foto in arrivo…</span>

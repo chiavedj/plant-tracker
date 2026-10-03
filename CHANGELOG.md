@@ -1,5 +1,12 @@
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.7.4] – 2025-08-29
+
+### Corretto
+- **Il placeholder non compariva più per le piante senza foto**: nella 1.7.3 un errore nel template aveva rimosso il ramo "senza foto", lasciando le card vuote sopra l'immagine
+  - Ripristinato il placeholder con icona di categoria per le piante senza foto
+  - Il fallback "foto eliminata" ora usa `display:none` inline invece delle classi Tailwind in conflitto, più affidabile con il CDN
+
 ## [1.7.3] – 2025-08-29
 
 ### Corretto
