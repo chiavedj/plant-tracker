@@ -23,10 +23,10 @@
                     <!-- Plant Image or Placeholder -->
                     <div class="relative h-56 bg-stone-100 overflow-hidden">
                         {% if plant.image_url %}
-                            <img src="{{ plant.image_url }}" alt="{{ plant.name }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
-                        {% else %}
+                            <img src="{{ plant.image_url }}" alt="{{ plant.name }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                 onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden')">
                             {% set cat_label, cat_icon = plant_category(plant.name, plant.species) %}
-                            <div class="w-full h-full bg-gradient-to-tr from-emerald-100/70 via-stone-50 to-stone-100 flex flex-col items-center justify-center gap-2">
+                            <div class="hidden flex w-full h-full bg-gradient-to-tr from-emerald-100/70 via-stone-50 to-stone-100 flex-col items-center justify-center gap-2">
                                 <i class="fa-solid {{ cat_icon }} text-6xl text-emerald-800/20 group-hover:scale-110 transition-transform duration-500"></i>
                                 <span class="text-[10px] uppercase tracking-wider text-stone-400 font-semibold">{{ cat_label }}</span>
                                 <span class="text-[10px] text-stone-400 italic">Foto in arrivo…</span>
@@ -292,11 +292,17 @@
         fetch(`/plant/${plantId}`)
             .then(res => res.json())
             .then(data => {
+                const detailImg = document.getElementById('detail-img');
+                // Se il file della foto non esiste più, torna al placeholder
+                detailImg.onerror = function() {
+                    if (this.src.endsWith('/static/img/placeholder.svg')) return; // evita loop
+                    this.src = '/static/img/placeholder.svg';
+                };
                 if (data.image_url && !data.image_url.includes('placeholder')) {
-                    document.getElementById('detail-img').src = data.image_url;
+                    detailImg.src = data.image_url;
                 } else {
                     // Placeholder illustrato per piante senza foto
-                    document.getElementById('detail-img').src = '/static/img/placeholder.svg';
+                    detailImg.src = '/static/img/placeholder.svg';
                 }
                 document.getElementById('detail-name').innerText = data.name;
                 document.getElementById('detail-mobile-name').innerText = data.name;

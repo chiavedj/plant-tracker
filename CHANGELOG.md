@@ -1,5 +1,13 @@
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.7.3] – 2025-08-29
+
+### Corretto
+- **Foto mancanti non mostrano più l'immagine rotta**: le piante che puntano a file foto eliminati ora mostrano automaticamente il placeholder della categoria
+  - Fallback immediato nel browser (`onerror`): se il file della foto non esiste, la card scambia l'immagine con il placeholder illustrato
+  - Migrazione automatica all'avvio: i riferimenti a foto non più presenti su disco vengono rimossi dal database (in modo permanente)
+  - Anche il **dettaglio pianta** torna al placeholder illustrato se la foto non è più disponibile
+
 ## [1.7.2] – 2025-08-29
 
 ### Aggiunto

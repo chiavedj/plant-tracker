@@ -11,7 +11,7 @@ import time
 import requests
 import google.generativeai as genai
 
-__version__ = "1.7.2"  # Fonte unica della versione (vedi CHANGELOG.md)
+__version__ = "1.7.3"  # Fonte unica della versione (vedi CHANGELOG.md)
 
 app = Flask(__name__)
 app.secret_key = "plant_tracker_super_secret_key"
@@ -1561,6 +1561,18 @@ if __name__ == '__main__':
         if regenerated:
             db.session.commit()
             print(f"Migrazione: rigenerati i consigli stagionali di {regenerated} piante in base alla specie")
+        
+        # Migrazione 1.7.3: ripristina le piante che puntano a foto non più
+        # presenti su disco (file eliminati), così la card mostra il placeholder
+        missing_fixed = 0
+        for p in Plant.query.filter(Plant.image_url.isnot(None)).all():
+            file_path = os.path.join(app.root_path, p.image_url.lstrip('/'))
+            if not os.path.exists(file_path):
+                p.image_url = None
+                missing_fixed += 1
+        if missing_fixed:
+            db.session.commit()
+            print(f"Migrazione: ripuliti {missing_fixed} riferimenti a foto non più presenti su disco")
         
         # Populate with some default plants if db is empty
         if Plant.query.count() == 0:
