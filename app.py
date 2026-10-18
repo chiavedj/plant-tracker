@@ -14,7 +14,7 @@ import google.generativeai as genai
 import io
 from PIL import Image
 
-__version__ = "1.7.7"  # Fonte unica della versione (vedi CHANGELOG.md)
+__version__ = "1.7.8"  # Fonte unica della versione (vedi CHANGELOG.md)
 
 app = Flask(__name__)
 app.secret_key = "plant_tracker_super_secret_key"
@@ -177,7 +177,7 @@ def _set_job(job_id, **fields):
             job.update(fields)
 
 
-def _run_diagnosis_job(job_id, image_path, plant_name, species):
+def _run_diagnosis_job(job_id, image_path, plant_name, species, model_override=None):
     """Esegue l'analisi IA in background e aggiorna lo stato del job.
     Se il thread muore per un'eccezione inattesa, il job finisce in errore
     (il frontend mostra il messaggio invece di restare in attesa eterna)."""
@@ -185,10 +185,15 @@ def _run_diagnosis_job(job_id, image_path, plant_name, species):
     # senza app_context() l'accesso al database (get_app_settings) fallirebbe.
     with app.app_context():
         try:
-            result = analyze_plant_image(image_path, plant_name, species)
-            _set_job(job_id, result=result,
-                     status='complete' if result.get('status') != 'error' else 'error',
-                     finished_at=time.time())
+            result = analyze_plant_image(image_path, plant_name, species,
+                                         model_override=model_override)
+            if result.get('status') == 'needs_model_choice':
+                new_status = 'needs_choice'
+            elif result.get('status') == 'error':
+                new_status = 'error'
+            else:
+                new_status = 'complete'
+            _set_job(job_id, result=result, status=new_status, finished_at=time.time())
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -497,7 +502,7 @@ def optimize_image_for_ai(image_path):
         with open(image_path, "rb") as f:
             return f.read()
 
-def analyze_plant_image(image_path, plant_name, species_hint=""):
+def analyze_plant_image(image_path, plant_name, species_hint="", model_override=None):
     settings = get_app_settings()
     ai_provider = settings.ai_provider or 'openai'
     
@@ -581,7 +586,7 @@ def analyze_plant_image(image_path, plant_name, species_hint=""):
             optimized_image_bytes = optimize_image_for_ai(image_path)
             base64_image = base64.b64encode(optimized_image_bytes).decode('utf-8')
 
-            selected_model = get_selected_model(settings, 'openai')
+            selected_model = model_override or get_selected_model(settings, 'openai')
             result_model_used = selected_model
             client = openai.OpenAI(api_key=api_key)
             response = client.chat.completions.create(
@@ -607,21 +612,17 @@ def analyze_plant_image(image_path, plant_name, species_hint=""):
         
         else: # Google Gemini / Gemma
             genai.configure(api_key=api_key)
-            
-            # Il modello scelto dall'utente viene provato per primo,
-            # poi eventuali fallback nello stesso listino
-            preferred = get_selected_model(settings, 'google')
-            models_to_try = [preferred] + [
-                m for m in [
-                    'models/gemini-3.6-flash',
-                    'models/gemini-2.5-flash', 
-                    'models/gemini-flash-latest'
-                ] if m != preferred
-            ]
-            
+
+            # IMPORTANTE: viene usato SOLO il modello scelto dall'utente (o
+            # quello confermato esplicitamente). Nessun passaggio automatico ad
+            # altri modelli: se fallisce, chiediamo all'utente cosa fare.
+            preferred = model_override or get_selected_model(settings, 'google')
+            result_model_used = preferred
+
             result = None
             last_error = ""
-            
+            failed_models = []
+
             safety_settings = [
                 {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
                 {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
@@ -629,52 +630,57 @@ def analyze_plant_image(image_path, plant_name, species_hint=""):
                 {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
             ]
 
-            for model_name in models_to_try:
-                try:
-                    print(f"Trying model: {model_name}...")
-                    model = genai.GenerativeModel(model_name)
-                    # Ottimizza l'immagine (ridimensionamento a 1024px) prima di inviarla
-                    image_data = optimize_image_for_ai(image_path)
-                    
-                    contents = [
-                        prompt,
-                        {"mime_type": "image/jpeg", "data": image_data}
-                    ]
-                    
-                    response = model.generate_content(
-                        contents,
-                        safety_settings=safety_settings
-                    )
-                    
-                    if response and response.text:
-                        result = json.loads(clean_ai_json(response.text))
-                        result["model_used"] = model_name
-                        result_model_used = model_name
-                        print(f"Success with model: {model_name}")
-                        break
-                except Exception as e:
-                    last_error = str(e)
-                    failed_models.append({'model': model_name, 'error': last_error})
-                    print(f"Model {model_name} failed: {last_error}")
-                    continue
-            
+            try:
+                print(f"Trying model: {preferred}...")
+                model = genai.GenerativeModel(preferred)
+                # Ottimizza l'immagine (ridimensionamento a 1024px) prima di inviarla
+                image_data = optimize_image_for_ai(image_path)
+
+                contents = [
+                    prompt,
+                    {"mime_type": "image/jpeg", "data": image_data}
+                ]
+
+                response = model.generate_content(
+                    contents,
+                    safety_settings=safety_settings
+                )
+
+                if response and response.text:
+                    result = json.loads(clean_ai_json(response.text))
+                    result["model_used"] = preferred
+                    print(f"Success with model: {preferred}")
+            except Exception as e:
+                last_error = str(e)
+                print(f"Model {preferred} failed: {last_error}")
+
             if result is None:
-                raise Exception(f"Tutti i modelli provati hanno fallito. Ultimo errore: {last_error}")
+                # Nessun fallback automatico: se l'utente ha già scelto un
+                # modello alternativo, segnaliamo l'errore definitivo.
+                if model_override:
+                    raise Exception(f"Il modello selezionato non ha risposto. Errore: {last_error}")
+                # Altrimenti chiediamo all'utente quale modello usare.
+                alternatives = [
+                    {'id': m['id'], 'name': m['name'], 'desc': m['desc']}
+                    for m in AI_MODELS.get('google', [])
+                    if m['id'] != preferred
+                ]
+                return {
+                    "status": "needs_model_choice",
+                    "is_mock": False,
+                    "message": (f"Il modello selezionato ({_get_model_display_name(preferred)}) "
+                                f"non ha risposto: {last_error}"),
+                    "preferred_model_id": preferred,
+                    "preferred_model_name": _get_model_display_name(preferred),
+                    "failed_error": last_error,
+                    "alternatives": alternatives,
+                }
 
         # Nota: niente 'return' anticipato nel ramo Google,
         # così is_mock viene impostato correttamente per TUTTI i provider
         result["is_mock"] = False
         result["model_used_id"] = result_model_used
         result["model_used_name"] = _get_model_display_name(result_model_used)
-        # Trasparenza: se l'utente ha scelto un modello ma l'IA ha risposto con
-        # un fallback, lo dichiariamo chiaramente nella pagina del risultato.
-        preferred = get_selected_model(settings, ai_provider)
-        if failed_models or result_model_used != preferred:
-            result["model_fallback_warning"] = {
-                "preferred": _get_model_display_name(preferred),
-                "used": _get_model_display_name(result_model_used),
-                "failed": [{'name': _get_model_display_name(f['model']), 'error': f['error']} for f in failed_models],
-            }
         return result
 
     except Exception as e:
@@ -1395,6 +1401,57 @@ def diagnose_status(job_id):
     return jsonify(payload)
 
 
+@app.route('/diagnose/choice/<job_id>')
+def diagnose_choice(job_id):
+    """Mostra la scelta del modello quando quello selezionato non ha risposto:
+    l'app NON cambia modello da sola, chiede all'utente."""
+    with _diagnosis_jobs_lock:
+        job = diagnosis_jobs.get(job_id)
+    if job is None:
+        flash("Analisi non trovata o scaduta. Ricarica la foto.", "error")
+        return redirect(url_for('diagnose_page'))
+    if job['status'] == 'processing':
+        return redirect(url_for('diagnose_wait', job_id=job_id))
+    result = job.get('result') or {}
+    if job['status'] != 'needs_choice':
+        return redirect(url_for('diagnose_result_page', job_id=job_id))
+    return render_template('diagnose_choice.html', job_id=job_id,
+                           image_url=job['image_url'],
+                           plant_name=job['plant_name'],
+                           preferred_model_name=result.get('preferred_model_name', 'Modello selezionato'),
+                           error_message=result.get('failed_error') or result.get('message', ''),
+                           alternatives=result.get('alternatives', []))
+
+
+@app.route('/diagnose/retry/<job_id>', methods=['POST'])
+def diagnose_retry(job_id):
+    """Rilancia l'analisi usando il modello scelto esplicitamente dall'utente."""
+    with _diagnosis_jobs_lock:
+        job = diagnosis_jobs.get(job_id)
+    if job is None:
+        flash("Analisi non trovata o scaduta. Ricarica la foto.", "error")
+        return redirect(url_for('diagnose_page'))
+
+    model = (request.form.get('model') or '').strip()
+    if not model:
+        flash("Seleziona un modello per riprovare.", "error")
+        return redirect(url_for('diagnose_choice', job_id=job_id))
+
+    # Ricostruisce il percorso della foto dal suo URL pubblico
+    image_path = os.path.join(app.root_path, job['image_url'].lstrip('/'))
+
+    # Riporta il job in stato 'processing' e riavvia l'analisi col modello scelto
+    _set_job(job_id, status='processing', result=None, finished_at=None, model_override=model)
+    t = threading.Thread(
+        target=_run_diagnosis_job,
+        args=(job_id, image_path, job['plant_name'], job['species'], model),
+        daemon=True
+    )
+    t.start()
+
+    return redirect(url_for('diagnose_wait', job_id=job_id))
+
+
 @app.route('/diagnose/result/<job_id>')
 def diagnose_result_page(job_id):
     with _diagnosis_jobs_lock:
@@ -1403,9 +1460,11 @@ def diagnose_result_page(job_id):
         flash("Analisi non trovata o scaduta. Ricarica la foto.", "error")
         return redirect(url_for('diagnose_page'))
     # 'complete' ed 'error' mostrano entrambi la pagina risultato
-    # (l'errore è già nel dict result); solo 'processing' rimanda all'attesa
+    # (l'errore è già nel dict result); 'needs_choice' rimanda alla scelta modello
     if job['status'] == 'processing':
         return redirect(url_for('diagnose_wait', job_id=job_id))
+    if job['status'] == 'needs_choice':
+        return redirect(url_for('diagnose_choice', job_id=job_id))
 
     diagnosis = job['result']
     return render_template('diagnose_result.html',

@@ -118,6 +118,13 @@
                 window.location.replace("/diagnose/result/" + jobId);
                 return;
             }
+            if (data.status === "needs_choice") {
+                // Il modello scelto non ha risposto: NON cambiamo modello da soli,
+                // portiamo l'utente alla schermata in cui scegliere cosa fare.
+                document.getElementById('progress-bar').style.width = "100%";
+                window.location.replace("/diagnose/choice/" + jobId);
+                return;
+            }
             // se il job non esiste più (es. server riavviato) e non è mai stato completato
             if (data.status === "missing") {
                 document.getElementById('error-message').textContent =

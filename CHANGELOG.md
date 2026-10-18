@@ -1,5 +1,13 @@
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.7.8] – 2025-08-29
+
+### Modificato
+- **Niente più cambio automatico di modello nella diagnosi**: prima, se il modello scelto (es. Gemma 4 31B) non rispondeva, l'app passava da sola a un altro modello (es. Gemini Flash) e mostrava solo un avviso a posteriori. Ora **non succede più senza il tuo consenso**
+  - Viene usato **solo** il modello che hai scelto nelle Impostazioni
+  - Se non risponde, appare una pagina "Scegli come procedere": vedi l'errore reale e puoi selezionare un altro modello dalla lista, oppure andare nelle Impostazioni
+  - Solo dopo una tua scelta esplicita l'analisi riparte con quel modello (con un nuovo tentativo in background, sempre resiliente allo standby)
+
 ## [1.7.7] – 2025-08-29
 
 ### Corretto

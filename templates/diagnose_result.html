@@ -43,27 +43,10 @@
             </a>
         </div>
     {% else %}
-        {% if diagnosis.model_fallback_warning %}
-        <div class="bg-amber-50 border border-amber-200 text-amber-900 px-5 py-4 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
-            <div class="flex items-start space-x-3">
-                <i class="fa-solid fa-triangle-exclamation text-2xl text-amber-600 mt-0.5 flex-shrink-0"></i>
-                <div>
-                    <h4 class="font-bold text-sm">Modello sostituito automaticamente</h4>
-                    <p class="text-xs text-stone-600 mt-0.5">Avevi selezionato <strong>{{ diagnosis.model_fallback_warning.requested }}</strong>, ma non era disponibile. L'analisi è stata completata con <strong>{{ diagnosis.model_fallback_warning.used }}</strong>.</p>
-                    {% if diagnosis.model_fallback_warning.errors %}
-                    <p class="text-xs text-stone-500 mt-1">Motivo: {{ diagnosis.model_fallback_warning.errors[0] }}</p>
-                    {% endif %}
-                </div>
-            </div>
-            <a href="/settings" class="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4.5 py-2.5 rounded-xl shadow-sm transition-all text-center flex-shrink-0">
-                Cambia modello
-            </a>
-        </div>
-        {% endif %}
         <div class="bg-emerald-50 border border-emerald-200 text-emerald-900 px-5 py-4 rounded-3xl flex items-center space-x-3 shadow-sm">
             <i class="fa-solid fa-brain text-2xl text-emerald-600 flex-shrink-0"></i>
             <div>
-                <h4 class="font-bold text-sm">Diagnosi Reale Integrata con {{ diagnosis.model_used }}!</h4>
+                <h4 class="font-bold text-sm">Diagnosi completata con {{ diagnosis.model_used_name or diagnosis.model_used }}!</h4>
                 <p class="text-xs text-stone-600">L'analisi fotografica è stata condotta in tempo reale valutando le caratteristiche biologiche riscontrate.</p>
             </div>
         </div>
