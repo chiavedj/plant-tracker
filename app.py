@@ -14,7 +14,7 @@ import google.generativeai as genai
 import io
 from PIL import Image
 
-__version__ = "1.7.8"  # Fonte unica della versione (vedi CHANGELOG.md)
+__version__ = "1.8.0"  # Fonte unica della versione (vedi CHANGELOG.md)
 
 app = Flask(__name__)
 app.secret_key = "plant_tracker_super_secret_key"
@@ -71,22 +71,57 @@ class Task(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 # Modelli IA disponibili, suddivisi per provider
+# 'vision': True  -> il modello analizza anche le immagini (diagnosi foto)
+# 'vision': False -> solo testo (chat, consigli, suggerimenti)
 AI_MODELS = {
     'openai': [
-        {'id': 'gpt-4o-mini', 'name': 'GPT-4o mini', 'desc': 'Economico e veloce (consigliato)', 'icon': 'fa-feather'},
-        {'id': 'gpt-4.1-nano', 'name': 'GPT-4.1 nano', 'desc': 'Il più economico in assoluto', 'icon': 'fa-seedling'},
-        {'id': 'gpt-4.1-mini', 'name': 'GPT-4.1 mini', 'desc': 'Buon compromesso qualità/prezzo', 'icon': 'fa-scale-balanced'},
-        {'id': 'gpt-4o', 'name': 'GPT-4o', 'desc': 'Massima qualità, più costoso', 'icon': 'fa-gem'},
+        {'id': 'gpt-4o-mini', 'name': 'GPT-4o mini', 'desc': 'Economico e veloce (consigliato)', 'icon': 'fa-feather', 'vision': True},
+        {'id': 'gpt-4.1-nano', 'name': 'GPT-4.1 nano', 'desc': 'Il più economico in assoluto', 'icon': 'fa-seedling', 'vision': True},
+        {'id': 'gpt-4.1-mini', 'name': 'GPT-4.1 mini', 'desc': 'Buon compromesso qualità/prezzo', 'icon': 'fa-scale-balanced', 'vision': True},
+        {'id': 'gpt-4o', 'name': 'GPT-4o', 'desc': 'Massima qualità, più costoso', 'icon': 'fa-gem', 'vision': True},
     ],
     'google': [
-        {'id': 'models/gemini-3.6-flash', 'name': 'Gemini 3.6 Flash', 'desc': 'Veloce ed economico (consigliato)', 'icon': 'fa-feather'},
-        {'id': 'models/gemini-2.5-flash', 'name': 'Gemini 2.5 Flash', 'desc': 'Più intelligente, costo moderato', 'icon': 'fa-scale-balanced'},
-        {'id': 'models/gemini-flash-latest', 'name': 'Gemini Flash Latest', 'desc': 'Ultima versione flash disponibile', 'icon': 'fa-wand-magic-sparkles'},
-        {'id': 'models/gemma-4-31b-it', 'name': 'Gemma 4 31B', 'desc': 'GRATUITO — il più potente, risposta lenta', 'icon': 'fa-gift'},
-        {'id': 'models/gemma-3-27b-it', 'name': 'Gemma 3 27B', 'desc': 'GRATUITO — qualità elevata, lento', 'icon': 'fa-gift'},
-        {'id': 'models/gemma-3-12b-it', 'name': 'Gemma 3 12B', 'desc': 'GRATUITO — leggero e veloce', 'icon': 'fa-gift'},
+        {'id': 'models/gemini-3.6-flash', 'name': 'Gemini 3.6 Flash', 'desc': 'Veloce ed economico (consigliato)', 'icon': 'fa-feather', 'vision': True},
+        {'id': 'models/gemini-2.5-flash', 'name': 'Gemini 2.5 Flash', 'desc': 'Più intelligente, costo moderato', 'icon': 'fa-scale-balanced', 'vision': True},
+        {'id': 'models/gemini-flash-latest', 'name': 'Gemini Flash Latest', 'desc': 'Ultima versione flash disponibile', 'icon': 'fa-wand-magic-sparkles', 'vision': True},
+        {'id': 'models/gemma-4-31b-it', 'name': 'Gemma 4 31B', 'desc': 'GRATUITO — solo testo, non vede le foto', 'icon': 'fa-gift', 'vision': False},
+        {'id': 'models/gemma-3-27b-it', 'name': 'Gemma 3 27B', 'desc': 'GRATUITO — solo testo, non vede le foto', 'icon': 'fa-gift', 'vision': False},
+        {'id': 'models/gemma-3-12b-it', 'name': 'Gemma 3 12B', 'desc': 'GRATUITO — solo testo, non vede le foto', 'icon': 'fa-gift', 'vision': False},
+    ],
+    # OpenRouter: aggregatore di modelli gratuiti ("...:free").
+    # I modelli VISION vedono le immagini e sono adatti alla diagnosi foto.
+    'openrouter': [
+        {'id': 'qwen/qwen2.5-vl-72b-instruct:free', 'name': 'Qwen2.5-VL 72B', 'desc': 'VISION · GRATUITO — ottimo per le foto (consigliato)', 'icon': 'fa-gift', 'vision': True},
+        {'id': 'meta-llama/llama-3.2-11b-vision-instruct:free', 'name': 'Llama 3.2 11B Vision', 'desc': 'VISION · GRATUITO — leggero e veloce', 'icon': 'fa-gift', 'vision': True},
+        {'id': 'google/gemma-3-27b-it:free', 'name': 'Gemma 3 27B', 'desc': 'VISION · GRATUITO — buona qualità', 'icon': 'fa-gift', 'vision': True},
+        {'id': 'meta-llama/llama-3.3-70b-instruct:free', 'name': 'Llama 3.3 70B', 'desc': 'GRATUITO — solo testo, per la chat', 'icon': 'fa-comments', 'vision': False},
+        {'id': 'deepseek/deepseek-chat:free', 'name': 'DeepSeek Chat', 'desc': 'GRATUITO — solo testo, per la chat', 'icon': 'fa-comments', 'vision': False},
     ]
 }
+
+def vision_models(provider):
+    """Modelli del provider in grado di analizzare le immagini."""
+    return [m for m in AI_MODELS.get(provider, []) if m.get('vision')]
+
+
+def _needs_model_choice(provider, preferred, error):
+    """Risultato speciale: il modello scelto non ha risposto.
+    Non cambiamo modello da soli: chiediamo all'utente (vedi diagnose_choice)."""
+    alternatives = [
+        {'id': m['id'], 'name': m['name'], 'desc': m['desc']}
+        for m in vision_models(provider)
+        if m['id'] != preferred
+    ]
+    return {
+        "status": "needs_model_choice",
+        "is_mock": False,
+        "message": (f"Il modello selezionato ({_get_model_display_name(preferred)}) "
+                    f"non ha risposto: {error}"),
+        "preferred_model_id": preferred,
+        "preferred_model_name": _get_model_display_name(preferred),
+        "failed_error": error,
+        "alternatives": alternatives,
+    }
 
 class Settings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -108,6 +143,43 @@ def get_selected_model(settings, provider):
         return saved
     # Default: primo modello della lista (sempre quello economico/consigliato)
     return valid_ids[0] if valid_ids else None
+
+
+# OpenRouter espone un'API compatibile con OpenAI: basta cambiare base_url.
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+def get_openrouter_client(api_key):
+    """Client OpenAI-compatibile puntato su OpenRouter."""
+    import openai
+    return openai.OpenAI(
+        api_key=api_key,
+        base_url=OPENROUTER_BASE_URL,
+        default_headers={
+            "HTTP-Referer": "https://github.com/chiavedj/plant-tracker",
+            "X-Title": "Florae Plant Tracker",
+        },
+    )
+
+
+def get_openai_compatible_client(provider, api_key):
+    """Client per i provider che parlano l'API OpenAI (OpenAI e OpenRouter)."""
+    if provider == 'openrouter':
+        return get_openrouter_client(api_key)
+    import openai
+    return openai.OpenAI(api_key=api_key)
+
+
+def provider_api_key(settings):
+    """Restituisce (provider, api_key) in base alle impostazioni salvate."""
+    provider = settings.ai_provider or 'openai'
+    if provider == 'openai':
+        key = settings.openai_api_key or os.environ.get('OPENAI_API_KEY')
+    elif provider == 'google':
+        key = settings.google_api_key or os.environ.get('GOOGLE_API_KEY')
+    else:  # openrouter
+        key = settings.openrouter_api_key or os.environ.get('OPENROUTER_API_KEY')
+    return provider, key
+
 
 # Helper to get/init app settings
 def get_app_settings():
@@ -580,36 +652,48 @@ def analyze_plant_image(image_path, plant_name, species_hint="", model_override=
         }}
         """
 
-        if ai_provider == 'openai':
-            import openai
+        if ai_provider in ('openai', 'openrouter'):
+            # OpenAI e OpenRouter condividono la stessa API (OpenAI-compatibile)
             # Ottimizza l'immagine (ridimensionamento a 1024px) prima di inviarla
             optimized_image_bytes = optimize_image_for_ai(image_path)
             base64_image = base64.b64encode(optimized_image_bytes).decode('utf-8')
 
-            selected_model = model_override or get_selected_model(settings, 'openai')
+            selected_model = model_override or get_selected_model(settings, ai_provider)
             result_model_used = selected_model
-            client = openai.OpenAI(api_key=api_key)
-            response = client.chat.completions.create(
-                model=selected_model,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{base64_image}"
+            if ai_provider == 'openrouter':
+                client = get_openrouter_client(api_key)
+            else:
+                import openai
+                client = openai.OpenAI(api_key=api_key)
+
+            try:
+                response = client.chat.completions.create(
+                    model=selected_model,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": prompt},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/jpeg;base64,{base64_image}"
+                                    }
                                 }
-                            }
-                        ]
-                    }
-                ],
-                response_format={"type": "json_object"},
-                max_tokens=1000
-            )
-            result = json.loads(response.choices[0].message.content)
-        
+                            ]
+                        }
+                    ],
+                    response_format={"type": "json_object"},
+                    max_tokens=1000
+                )
+                result = json.loads(clean_ai_json(response.choices[0].message.content))
+            except Exception as e:
+                # Nessun cambio automatico di modello: se l'utente ha già
+                # confermato un modello, l'errore è definitivo.
+                if model_override:
+                    raise
+                return _needs_model_choice(ai_provider, selected_model, str(e))
+
         else: # Google Gemini / Gemma
             genai.configure(api_key=api_key)
 
@@ -660,21 +744,7 @@ def analyze_plant_image(image_path, plant_name, species_hint="", model_override=
                 if model_override:
                     raise Exception(f"Il modello selezionato non ha risposto. Errore: {last_error}")
                 # Altrimenti chiediamo all'utente quale modello usare.
-                alternatives = [
-                    {'id': m['id'], 'name': m['name'], 'desc': m['desc']}
-                    for m in AI_MODELS.get('google', [])
-                    if m['id'] != preferred
-                ]
-                return {
-                    "status": "needs_model_choice",
-                    "is_mock": False,
-                    "message": (f"Il modello selezionato ({_get_model_display_name(preferred)}) "
-                                f"non ha risposto: {last_error}"),
-                    "preferred_model_id": preferred,
-                    "preferred_model_name": _get_model_display_name(preferred),
-                    "failed_error": last_error,
-                    "alternatives": alternatives,
-                }
+                return _needs_model_choice('google', preferred, last_error)
 
         # Nota: niente 'return' anticipato nel ramo Google,
         # così is_mock viene impostato correttamente per TUTTI i provider
@@ -721,11 +791,10 @@ def get_best_purchase_time(plant_name, species=""):
         """
         
         def _ask():
-            if ai_provider == 'openai':
-                import openai
-                client = openai.OpenAI(api_key=api_key)
+            if ai_provider in ('openai', 'openrouter'):
+                client = get_openai_compatible_client(ai_provider, api_key)
                 response = client.chat.completions.create(
-                    model=get_selected_model(settings, 'openai'),
+                    model=get_selected_model(settings, ai_provider),
                     messages=[{"role": "user", "content": prompt}]
                 )
                 return response.choices[0].message.content.strip()
@@ -792,15 +861,14 @@ def get_seasonal_suggestions():
         }}
         """
         
-        if ai_provider == 'openai':
-            import openai
-            client = openai.OpenAI(api_key=api_key)
+        if ai_provider in ('openai', 'openrouter'):
+            client = get_openai_compatible_client(ai_provider, api_key)
             response = client.chat.completions.create(
-                model=get_selected_model(settings, 'openai'),
+                model=get_selected_model(settings, ai_provider),
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"}
             )
-            data = json.loads(response.choices[0].message.content)
+            data = json.loads(clean_ai_json(response.choices[0].message.content))
         else: # Google Gemini / Gemma
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel(get_selected_model(settings, 'google'))
@@ -1373,7 +1441,17 @@ def diagnose_page():
 
         return redirect(url_for('diagnose_wait', job_id=job_id))
 
-    return render_template('diagnose.html', plants=plants)
+    # Avvisa se il modello scelto non può vedere le immagini (es. Gemma testo)
+    _settings = get_app_settings()
+    _provider = _settings.ai_provider or 'openai'
+    _model = get_selected_model(_settings, _provider)
+    _vision_ids = [m['id'] for m in vision_models(_provider)]
+    _model_is_vision = _model in _vision_ids
+    _model_name = _get_model_display_name(_model) if _model else '—'
+
+    return render_template('diagnose.html', plants=plants,
+                           model_is_vision=_model_is_vision,
+                           current_model_name=_model_name)
 
 
 @app.route('/diagnose/wait/<job_id>')
@@ -1651,7 +1729,7 @@ def chatbot_send():
         return jsonify({'reply': 'Scrivi prima una domanda 🙂'})
     
     settings = get_app_settings()
-    api_key = settings.openai_api_key or os.environ.get('OPENAI_API_KEY') if (settings.ai_provider or 'openai') == 'openai' else (settings.google_api_key or os.environ.get('GOOGLE_API_KEY'))
+    provider, api_key = provider_api_key(settings)
     if not api_key:
         return jsonify({'reply': '⚠️ Per chattare serve una chiave API: configurala nella pagina Impostazioni.'})
     
@@ -1660,14 +1738,11 @@ def chatbot_send():
     system_prompt = CHAT_SYSTEM_PROMPT + _plants_context()
     recent = history[-12:]
     
-    recent = history[-12:]
-    provider = settings.ai_provider or 'openai'
-    
     def _ask(model_override=None):
         model_id = model_override or get_selected_model(settings, provider)
-        if provider == 'openai':
-            import openai
-            client = openai.OpenAI(api_key=api_key)
+        if provider in ('openai', 'openrouter'):
+            # OpenAI e OpenRouter condividono l'API chat completions
+            client = get_openai_compatible_client(provider, api_key)
             resp = client.chat.completions.create(
                 model=model_id,
                 messages=[{'role': 'system', 'content': system_prompt}] + recent

@@ -23,8 +23,8 @@
             <!-- Provider Selection -->
             <div>
                 <label class="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-2">Provider IA</label>
-                <div class="grid grid-cols-2 gap-4">
-                    <label class="relative flex items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition-all 
+                <div class="grid grid-cols-3 gap-4">
+                    <label id="provider-label-openai" class="relative flex items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition-all 
                         {% if current_provider == 'openai' %} border-emerald-600 bg-emerald-50 text-emerald-900 {% else %} border-stone-200 hover:border-stone-300 text-stone-600 {% endif %}">
                         <input type="radio" name="ai_provider" value="openai" class="hidden" {% if current_provider == 'openai' %} checked {% endif %}>
                         <div class="flex flex-col items-center">
@@ -32,12 +32,20 @@
                             <span class="font-bold text-sm">OpenAI</span>
                         </div>
                     </label>
-                    <label class="relative flex items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition-all 
+                    <label id="provider-label-google" class="relative flex items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition-all 
                         {% if current_provider == 'google' %} border-emerald-600 bg-emerald-50 text-emerald-900 {% else %} border-stone-200 hover:border-stone-300 text-stone-600 {% endif %}">
                         <input type="radio" name="ai_provider" value="google" class="hidden" {% if current_provider == 'google' %} checked {% endif %}>
                         <div class="flex flex-col items-center">
                             <i class="fa-solid fa-cloud text-xl mb-1"></i>
-                            <span class="font-bold text-sm">Google Gemini/Gemma</span>
+                            <span class="font-bold text-sm text-center">Google Gemini</span>
+                        </div>
+                    </label>
+                    <label id="provider-label-openrouter" class="relative flex items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition-all 
+                        {% if current_provider == 'openrouter' %} border-emerald-600 bg-emerald-50 text-emerald-900 {% else %} border-stone-200 hover:border-stone-300 text-stone-600 {% endif %}">
+                        <input type="radio" name="ai_provider" value="openrouter" class="hidden" {% if current_provider == 'openrouter' %} checked {% endif %}>
+                        <div class="flex flex-col items-center">
+                            <i class="fa-solid fa-gift text-xl mb-1"></i>
+                            <span class="font-bold text-sm text-center">OpenRouter<span class="block text-[10px] font-normal text-emerald-600">GRATIS</span></span>
                         </div>
                     </label>
                 </div>
@@ -60,6 +68,7 @@
                             <div class="flex-1">
                                 <div class="flex items-center justify-between">
                                     <span class="font-bold text-sm text-stone-900"><i class="fa-solid {{ m.icon }} text-emerald-600 mr-1.5"></i>{{ m.name }}</span>
+                                    {% if m.vision %}<span class="text-[10px] font-bold uppercase bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full" title="Vede le immagini: ok per la diagnosi foto">VISION</span>{% endif %}
                                     {% if loop.first %}<span class="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Consigliato</span>{% endif %}
                                 </div>
                                 <p class="text-xs text-stone-500 mt-0.5">{{ m.desc }}</p>
@@ -70,7 +79,7 @@
                 </div>
                 <p class="text-[11px] text-stone-500 mt-2 flex items-center space-x-1.5">
                     <i class="fa-solid fa-lightbulb text-amber-400"></i>
-                    <span>I modelli "mini", "flash" e "nano" costano una frazione dei modelli premium e sono perfetti per la diagnosi delle piante.</span>
+                    <span>Per la <strong>diagnosi delle foto</strong> serve un modello <strong>VISION</strong>: i modelli solo testo non riescono a vedere le immagini.</span>
                 </p>
             </div>
 
@@ -102,6 +111,22 @@
                         <i class="fa-solid fa-eye"></i>
                     </button>
                 </div>
+            </div>
+
+            <!-- OpenRouter API Key -->
+            <div id="openrouter-section" class="{% if current_provider != 'openrouter' %} opacity-50 pointer-events-none {% endif %} transition-opacity">
+                <label class="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-2">OpenRouter API Key</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-stone-400">
+                        <i class="fa-solid fa-lock"></i>
+                    </div>
+                    <input type="password" name="openrouter_api_key" id="openrouter-key-input" value="{{ openrouter_key }}" placeholder="sk-or-v1-..." 
+                           class="w-full bg-stone-50 border border-stone-200 pl-10 pr-12 py-3.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-mono">
+                    <button type="button" onclick="togglePasswordVisibility('openrouter-key-input')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-stone-400 hover:text-stone-600">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                </div>
+                <p class="text-[11px] text-stone-500 mt-1.5">Crea una chiave gratuita su <a href="https://openrouter.ai/keys" target="_blank" class="text-emerald-700 underline font-semibold">openrouter.ai/keys</a>. I modelli con suffisso <code>:free</code> non hanno costi (con limiti di utilizzo giornalieri).</p>
             </div>
 
             <p class="text-[11px] text-stone-500 mt-1.5 leading-relaxed">Nota: le chiavi vengono aggiornate solo se compili il campo — lasciandolo vuoto resta quella già salvata (o letta dalle variabili d'ambiente). Non vengono salvate in database pubblici.</p>
@@ -207,11 +232,10 @@
         }
     }
 
+    const PROVIDERS = ['openai', 'google', 'openrouter'];
+
     function updateProviderUI() {
         const selectedProvider = document.querySelector('input[name="ai_provider"]:checked')?.value;
-        const openaiSection = document.getElementById('openai-section');
-        const googleSection = document.getElementById('google-section');
-        const labels = document.querySelectorAll('.grid.grid-cols-2.gap-4 > label');
 
         // Mostra solo i modelli del provider selezionato
         document.querySelectorAll('#model-options .model-card').forEach(card => {
@@ -227,25 +251,22 @@
             }
         });
 
-        if (labels.length >= 2) {
-            const openaiLabel = labels[0];
-            const googleLabel = labels[1];
-            if (selectedProvider === 'openai') {
-                openaiSection.classList.remove('opacity-50', 'pointer-events-none');
-                googleSection.classList.add('opacity-50', 'pointer-events-none');
-                openaiLabel.classList.remove('border-stone-200', 'hover:border-stone-300', 'text-stone-600');
-                openaiLabel.classList.add('border-emerald-600', 'bg-emerald-50', 'text-emerald-900');
-                googleLabel.classList.remove('border-emerald-600', 'bg-emerald-50', 'text-emerald-900');
-                googleLabel.classList.add('border-stone-200', 'hover:border-stone-300', 'text-stone-600');
+        // Attiva solo la sezione chiave API del provider scelto
+        PROVIDERS.forEach(p => {
+            const section = document.getElementById(p + '-section');
+            const label = document.getElementById('provider-label-' + p);
+            if (!section || !label) return;
+            const active = (p === selectedProvider);
+            section.classList.toggle('opacity-50', !active);
+            section.classList.toggle('pointer-events-none', !active);
+            if (active) {
+                label.classList.remove('border-stone-200', 'hover:border-stone-300', 'text-stone-600');
+                label.classList.add('border-emerald-600', 'bg-emerald-50', 'text-emerald-900');
             } else {
-                googleSection.classList.remove('opacity-50', 'pointer-events-none');
-                openaiSection.classList.add('opacity-50', 'pointer-events-none');
-                googleLabel.classList.remove('border-stone-200', 'hover:border-stone-300', 'text-stone-600');
-                googleLabel.classList.add('border-emerald-600', 'bg-emerald-50', 'text-emerald-900');
-                openaiLabel.classList.remove('border-emerald-600', 'bg-emerald-50', 'text-emerald-900');
-                openaiLabel.classList.add('border-stone-200', 'hover:border-stone-300', 'text-stone-600');
+                label.classList.remove('border-emerald-600', 'bg-emerald-50', 'text-emerald-900');
+                label.classList.add('border-stone-200', 'hover:border-stone-300', 'text-stone-600');
             }
-        }
+        });
     }
 
     // Evidenzia la scheda modello quando viene selezionata

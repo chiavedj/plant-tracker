@@ -1,5 +1,20 @@
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.8.0] – 2025-08-29
+
+### Aggiunto
+- **Provider OpenRouter con modelli gratuiti**: nuovo provider selezionabile nelle Impostazioni, con modelli `:free` a costo zero
+  - **Qwen2.5-VL 72B** (VISION, consigliato), **Llama 3.2 11B Vision** (VISION), **Gemma 3 27B** (VISION)
+  - **Llama 3.3 70B** e **DeepSeek Chat** per la chat testuale
+  - API compatibile OpenAI: usa l'endpoint `https://openrouter.ai/api/v1`
+- **Etichetta VISION sui modelli**: badge azzurro sui modelli che sanno analizzare le immagini (necessari per la diagnosi foto)
+- **Avviso nella pagina di Diagnosi** se il modello scelto non vede le immagini (es. Gemma): spiega il problema e rimanda alle Impostazioni
+
+### Corretto
+- **Chiarezza sul motivo dei fallimenti con Gemma**: i modelli Gemma del provider Google sono **solo testo** e non possono analizzare le foto — era la causa dei fallimenti e del vecchio passaggio automatico a Gemini Flash. Ora sono etichettati come "solo testo, non vede le foto"
+- Nella scelta del modello alternativo (dopo un fallimento) vengono proposti **solo modelli VISION**, evitando di riproporre modelli che non possono funzionare con le foto
+- Parsing JSON reso più robusto anche per OpenAI/OpenRouter (usa `clean_ai_json`)
+
 ## [1.7.8] – 2025-08-29
 
 ### Modificato

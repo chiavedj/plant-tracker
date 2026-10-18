@@ -86,11 +86,13 @@ Il file `docker-compose.yml` nel repo è già configurato con volumi persistenti
 
 To enable real AI-powered photo analysis:
 1. Launch the app and go to **Settings** from the sidebar.
-2. Pick your **provider**: OpenAI or Google Gemini.
+2. Pick your **provider**: OpenAI, Google Gemini or OpenRouter.
 3. Paste your API key:
    - **OpenAI** → starts with `sk-...`, get one at [platform.openai.com](https://platform.openai.com/)
    - **Google** → starts with `AIzaSy...`, get one at [aistudio.google.com](https://aistudio.google.com/)
+   - **OpenRouter** → starts with `sk-or-v1-...`, get one at [openrouter.ai/keys](https://openrouter.ai/keys). Models ending in `:free` cost nothing (daily limits apply).
 4. Choose the **AI model** from the list — budget models (mini / flash / nano) work great for plant diagnosis at a fraction of the cost.
+   - ⚠️ For **photo diagnosis** you need a model marked **VISION**: text-only models (e.g. Gemma on the Google API) cannot see images.
 5. Click **Save Configuration**. Done! 🌱
 
 > 💡 Keys are updated only when you type something in the field — leaving it blank keeps the previously saved key.

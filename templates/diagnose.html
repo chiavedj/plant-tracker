@@ -13,6 +13,20 @@
     </div>
 
     <!-- Upload and Configuration Form -->
+    {% if not model_is_vision %}
+    <div class="bg-amber-50 border border-amber-200 text-amber-900 px-5 py-4 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+        <div class="flex items-start space-x-3">
+            <i class="fa-solid fa-triangle-exclamation text-2xl text-amber-600 mt-0.5 flex-shrink-0"></i>
+            <div>
+                <h4 class="font-bold text-sm">Il modello scelto non vede le immagini</h4>
+                <p class="text-xs text-stone-600 mt-0.5">Stai usando <strong>{{ current_model_name }}</strong>, che è un modello di testo: non può analizzare la foto. Per la diagnosi scegline uno con il badge <strong>VISION</strong>.</p>
+            </div>
+        </div>
+        <a href="/settings" class="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4.5 py-2.5 rounded-xl shadow-sm transition-all text-center flex-shrink-0">
+            Cambia modello
+        </a>
+    </div>
+    {% endif %}
     <form action="/diagnose" method="POST" enctype="multipart/form-data" class="bg-white rounded-3xl border border-stone-200/80 shadow-md p-6 md:p-8 space-y-6">
         
         <!-- Part 1: Select Plant Reference -->
