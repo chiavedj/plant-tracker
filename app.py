@@ -8,6 +8,7 @@ from werkzeug.utils import secure_filename
 import json
 import threading
 import time
+import uuid
 import requests
 import google.generativeai as genai
 import io
@@ -140,6 +141,69 @@ CHAT_TIMEOUT_SECONDS = 180  # La chat può aspettare di più: modelli grandi com
 # ad ogni apertura pagina). Scade dopo 6 ore.
 _SUGGESTIONS_CACHE = {}
 _SUGGESTIONS_CACHE_TTL = 60 * 60 * 6
+
+# --- DIAGNOSI ASINCRONA (anti "pagina non raggiungibile / scaduta") ---
+# L'analisi IA gira in un thread in background e il frontend fa polling.
+# Se il telefono va in standby durante l'analisi, il polling riprende al
+# risveglio e il risultato arriva comunque: il POST non muore mai.
+diagnosis_jobs = {}            # job_id -> dict di stato
+_diagnosis_jobs_lock = threading.Lock()
+_DIAGNOSIS_JOBS_TTL = 60 * 60  # i job completati restano in memoria 1 ora
+
+
+def _prune_diagnosis_jobs():
+    """Rimuove i job completati più vecchi di 1 ora per liberare memoria."""
+    now = time.time()
+    with _diagnosis_jobs_lock:
+        for jid in [j for j, v in diagnosis_jobs.items()
+                    if v.get('finished_at') and now - v['finished_at'] > _DIAGNOSIS_JOBS_TTL]:
+            diagnosis_jobs.pop(jid, None)
+
+
+def _get_model_display_name(model_id):
+    """Converte un ID modello interno (es. models/gemma-4-31b-it) in nome leggibile."""
+    for provider_models in AI_MODELS.values():
+        for m in provider_models:
+            if m['id'] == model_id:
+                return m['name']
+    return (model_id or 'IA').replace('models/', '').replace('-', ' ').title()
+
+
+def _set_job(job_id, **fields):
+    """Aggiorna in sicurezza lo stato di un job di diagnosi."""
+    with _diagnosis_jobs_lock:
+        job = diagnosis_jobs.get(job_id)
+        if job is not None:
+            job.update(fields)
+
+
+def _run_diagnosis_job(job_id, image_path, plant_name, species):
+    """Esegue l'analisi IA in background e aggiorna lo stato del job.
+    Se il thread muore per un'eccezione inattesa, il job finisce in errore
+    (il frontend mostra il messaggio invece di restare in attesa eterna)."""
+    try:
+        result = analyze_plant_image(image_path, plant_name, species)
+        _set_job(job_id, result=result,
+                 status='complete' if result.get('status') != 'error' else 'error',
+                 finished_at=time.time())
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        _set_job(job_id,
+                 result={
+                     "status": "error",
+                     "message": f"Errore inatteso durante l'analisi: {str(e)}",
+                     "is_mock": False,
+                     "plant_name": plant_name or "Pianta generica",
+                     "problem": "Diagnosi non disponibile",
+                     "details": "",
+                     "solution": "",
+                     "urgency": "Media",
+                     "exposure_rules": "",
+                     "watering_rules": "",
+                 },
+                 status='error',
+                 finished_at=time.time())
 
 def run_with_timeout(func, timeout_seconds=AI_CALL_TIMEOUT_SECONDS, raise_on_error=False):
     """Esegue func() in un thread separato.
@@ -478,6 +542,10 @@ def analyze_plant_image(image_path, plant_name, species_hint=""):
 
     # If API Key exists, we use the selected provider
     try:
+        # Tracciamento del modello effettivamente usato + eventuali fallback
+        result_model_used = None
+        failed_models = []
+
         # Common prompt for both providers
         prompt = f"""
         Sei un esperto agronomo e botanico virtuale. Analizza questa immagine di una pianta ({plant_name if plant_name else 'specie sconosciuta'}) e identifica:
@@ -508,6 +576,7 @@ def analyze_plant_image(image_path, plant_name, species_hint=""):
             base64_image = base64.b64encode(optimized_image_bytes).decode('utf-8')
 
             selected_model = get_selected_model(settings, 'openai')
+            result_model_used = selected_model
             client = openai.OpenAI(api_key=api_key)
             response = client.chat.completions.create(
                 model=selected_model,
@@ -574,10 +643,12 @@ def analyze_plant_image(image_path, plant_name, species_hint=""):
                     if response and response.text:
                         result = json.loads(clean_ai_json(response.text))
                         result["model_used"] = model_name
+                        result_model_used = model_name
                         print(f"Success with model: {model_name}")
                         break
                 except Exception as e:
                     last_error = str(e)
+                    failed_models.append({'model': model_name, 'error': last_error})
                     print(f"Model {model_name} failed: {last_error}")
                     continue
             
@@ -587,6 +658,17 @@ def analyze_plant_image(image_path, plant_name, species_hint=""):
         # Nota: niente 'return' anticipato nel ramo Google,
         # così is_mock viene impostato correttamente per TUTTI i provider
         result["is_mock"] = False
+        result["model_used_id"] = result_model_used
+        result["model_used_name"] = _get_model_display_name(result_model_used)
+        # Trasparenza: se l'utente ha scelto un modello ma l'IA ha risposto con
+        # un fallback, lo dichiariamo chiaramente nella pagina del risultato.
+        preferred = get_selected_model(settings, ai_provider)
+        if failed_models or result_model_used != preferred:
+            result["model_fallback_warning"] = {
+                "preferred": _get_model_display_name(preferred),
+                "used": _get_model_display_name(result_model_used),
+                "failed": [{'name': _get_model_display_name(f['model']), 'error': f['error']} for f in failed_models],
+            }
         return result
 
     except Exception as e:
@@ -1213,21 +1295,21 @@ def delete_task(id):
     return redirect(url_for('dashboard'))
 
 
-# --- AI DIAGNOSIS ---
+# --- AI DIAGNOSIS (ASINCRONA: niente più "pagina scaduta" quando il telefono va in standby) ---
 
 @app.route('/diagnose', methods=['GET', 'POST'])
 def diagnose_page():
     plants = Plant.query.order_by(Plant.name).all()
-    
+
     if request.method == 'POST':
         plant_id = request.form.get('plant_id')
         custom_plant_name = request.form.get('custom_plant_name')
-        
+
         image_file = request.files.get('plant_photo')
         if not image_file or image_file.filename == '':
             flash("Devi caricare una foto per poter effettuare la diagnosi!", "error")
             return redirect(url_for('diagnose_page'))
-            
+
         # Determine actual plant name
         if plant_id and plant_id != "new":
             try:
@@ -1242,7 +1324,7 @@ def diagnose_page():
         else:
             plant_name = custom_plant_name or "Pianta Sconosciuta"
             species = ""
-            
+
         # Save photo
         filename = secure_filename(image_file.filename)
         # Fallback se secure_filename svuota il nome (es. caratteri non-ASCII)
@@ -1252,19 +1334,80 @@ def diagnose_page():
         image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         image_file.save(os.path.join(app.root_path, image_path))
         full_image_url = '/' + image_path.replace('\\', '/')
-        
-        # Analyze using our helper
-        diagnosis = analyze_plant_image(os.path.join(app.root_path, image_path), plant_name, species)
-        
-        # Pass variables to template for confirm/apply step
-        return render_template('diagnose_result.html', 
-                               diagnosis=diagnosis, 
-                               image_url=full_image_url,
-                               plant_id=plant_id,
-                               custom_plant_name=plant_name,
-                               species=species)
+
+        # Crea un job asincrono: l'analisi IA gira in un thread in background
+        # e la pagina di attesa fa polling dello stato. Così il POST termina
+        # subito e non muore mai, nemmeno se lo schermo va in standby.
+        job_id = uuid.uuid4().hex
+        with _diagnosis_jobs_lock:
+            diagnosis_jobs[job_id] = {
+                'status': 'processing',
+                'created_at': time.time(),
+                'finished_at': None,
+                'result': None,
+                'image_url': full_image_url,
+                'plant_id': plant_id,
+                'plant_name': plant_name,
+                'species': species,
+            }
+        t = threading.Thread(
+            target=_run_diagnosis_job,
+            args=(job_id, os.path.join(app.root_path, image_path), plant_name, species),
+            daemon=True
+        )
+        # (plant_id e species sono già salvati nel job dict qui sopra)
+        t.start()
+        _prune_diagnosis_jobs()
+
+        return redirect(url_for('diagnose_wait', job_id=job_id))
 
     return render_template('diagnose.html', plants=plants)
+
+
+@app.route('/diagnose/wait/<job_id>')
+def diagnose_wait(job_id):
+    with _diagnosis_jobs_lock:
+        job = diagnosis_jobs.get(job_id)
+    if job is None:
+        flash("Analisi non trovata o scaduta. Ricarica la foto.", "error")
+        return redirect(url_for('diagnose_page'))
+    return render_template('diagnose_wait.html', job_id=job_id,
+                           image_url=job['image_url'],
+                           plant_name=job['plant_name'])
+
+
+@app.route('/diagnose/status/<job_id>')
+def diagnose_status(job_id):
+    with _diagnosis_jobs_lock:
+        job = diagnosis_jobs.get(job_id)
+    if job is None:
+        return jsonify({'status': 'missing'})
+    payload = {'status': job['status']}
+    # in caso di errore includiamo il messaggio per mostrarlo nella pagina di attesa
+    if job['status'] == 'error' and isinstance(job.get('result'), dict):
+        payload['result'] = {'message': job['result'].get('message', 'Errore sconosciuto.')}
+    return jsonify(payload)
+
+
+@app.route('/diagnose/result/<job_id>')
+def diagnose_result_page(job_id):
+    with _diagnosis_jobs_lock:
+        job = diagnosis_jobs.get(job_id)
+    if job is None:
+        flash("Analisi non trovata o scaduta. Ricarica la foto.", "error")
+        return redirect(url_for('diagnose_page'))
+    # 'complete' ed 'error' mostrano entrambi la pagina risultato
+    # (l'errore è già nel dict result); solo 'processing' rimanda all'attesa
+    if job['status'] == 'processing':
+        return redirect(url_for('diagnose_wait', job_id=job_id))
+
+    diagnosis = job['result']
+    return render_template('diagnose_result.html',
+                           diagnosis=diagnosis,
+                           image_url=job['image_url'],
+                           plant_id=job['plant_id'],
+                           custom_plant_name=job['plant_name'],
+                           species=job['species'])
 
 
 @app.route('/diagnose/apply', methods=['POST'])
