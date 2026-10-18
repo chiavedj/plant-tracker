@@ -1,5 +1,17 @@
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.8.1] – 2025-08-29
+
+### Corretto
+- **Modelli OpenRouter non più gratuiti**: i modelli `:free` inseriti nella 1.8.0 (Qwen2.5-VL 72B, Llama 3.2 Vision, Gemma 3 27B, Llama 3.3 70B, DeepSeek) non sono più disponibili gratuitamente su OpenRouter, provocando errori 404 "This model is unavailable for free"
+  - Sostituiti con modelli **verificati come gratuiti** al momento del rilascio: **Gemma 4 31B** (VISION), **Nemotron 3.5 Super VL** (VISION), **Gemma 4 26B** (VISION), **Nemotron 3 Nano Omni** (VISION), più Nemotron 3 Super 120B e Nemotron 3.5 Lightning per la chat
+
+### Aggiunto
+- **Aggiornamento automatico della lista modelli gratuiti OpenRouter**: l'app scarica l'elenco live dall'API di OpenRouter (cache 6 ore) e aggiorna da sola i modelli selezionabili, così non si verificano più errori da modelli rimossi
+  - I modelli scoperti vengono classificati automaticamente in **VISION** (vedono le immagini) e solo testo
+  - Pulsante **"Aggiorna lista modelli gratuiti"** nelle Impostazioni per forzare l'aggiornamento
+  - Se la rete non è disponibile resta la lista curata di fallback
+
 ## [1.8.0] – 2025-08-29
 
 ### Aggiunto

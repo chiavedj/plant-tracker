@@ -127,6 +127,10 @@
                     </button>
                 </div>
                 <p class="text-[11px] text-stone-500 mt-1.5">Crea una chiave gratuita su <a href="https://openrouter.ai/keys" target="_blank" class="text-emerald-700 underline font-semibold">openrouter.ai/keys</a>. I modelli con suffisso <code>:free</code> non hanno costi (con limiti di utilizzo giornalieri).</p>
+                <button type="submit" formaction="/settings/openrouter/refresh" formmethod="post" class="mt-3 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs px-4 py-2.5 rounded-xl transition-all inline-flex items-center space-x-2">
+                    <i class="fa-solid fa-rotate"></i>
+                    <span>Aggiorna lista modelli gratuiti</span>
+                </button>
             </div>
 
             <p class="text-[11px] text-stone-500 mt-1.5 leading-relaxed">Nota: le chiavi vengono aggiornate solo se compili il campo — lasciandolo vuoto resta quella già salvata (o letta dalle variabili d'ambiente). Non vengono salvate in database pubblici.</p>

@@ -14,7 +14,7 @@ import google.generativeai as genai
 import io
 from PIL import Image
 
-__version__ = "1.8.0"  # Fonte unica della versione (vedi CHANGELOG.md)
+__version__ = "1.8.1"  # Fonte unica della versione (vedi CHANGELOG.md)
 
 app = Flask(__name__)
 app.secret_key = "plant_tracker_super_secret_key"
@@ -70,6 +70,18 @@ class Task(db.Model):
     completed_at = db.Column(db.DateTime, nullable=True)  # Quando è stata completata (per la ricorrenza)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+# Modelli gratuiti OpenRouter curati a mano: usati come fallback se il
+# caricamento live dall'API non è disponibile. La disponibilità dei modelli
+# gratuiti cambia spesso, per questo l'app prova ad aggiornare la lista da sola.
+_OPENROUTER_CURATED = [
+    {'id': 'google/gemma-4-31b-it:free', 'name': 'Gemma 4 31B', 'desc': 'VISION · GRATUITO — qualità elevata (consigliato)', 'icon': 'fa-gift', 'vision': True},
+    {'id': 'nvidia/nemotron-3.5-super-vl:free', 'name': 'Nemotron 3.5 Super VL', 'desc': 'VISION · GRATUITO — specializzato nelle immagini', 'icon': 'fa-gift', 'vision': True},
+    {'id': 'google/gemma-4-26b-a4b-it:free', 'name': 'Gemma 4 26B', 'desc': 'VISION · GRATUITO — leggero e veloce', 'icon': 'fa-gift', 'vision': True},
+    {'id': 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free', 'name': 'Nemotron 3 Nano Omni', 'desc': 'VISION · GRATUITO — con ragionamento', 'icon': 'fa-gift', 'vision': True},
+    {'id': 'nvidia/nemotron-3-super-120b-a12b:free', 'name': 'Nemotron 3 Super 120B', 'desc': 'GRATUITO — solo testo, per la chat', 'icon': 'fa-comments', 'vision': False},
+    {'id': 'nvidia/nemotron-3.5-lightning:free', 'name': 'Nemotron 3.5 Lightning', 'desc': 'GRATUITO — solo testo, chat veloce', 'icon': 'fa-comments', 'vision': False},
+]
+
 # Modelli IA disponibili, suddivisi per provider
 # 'vision': True  -> il modello analizza anche le immagini (diagnosi foto)
 # 'vision': False -> solo testo (chat, consigli, suggerimenti)
@@ -90,18 +102,78 @@ AI_MODELS = {
     ],
     # OpenRouter: aggregatore di modelli gratuiti ("...:free").
     # I modelli VISION vedono le immagini e sono adatti alla diagnosi foto.
-    'openrouter': [
-        {'id': 'qwen/qwen2.5-vl-72b-instruct:free', 'name': 'Qwen2.5-VL 72B', 'desc': 'VISION · GRATUITO — ottimo per le foto (consigliato)', 'icon': 'fa-gift', 'vision': True},
-        {'id': 'meta-llama/llama-3.2-11b-vision-instruct:free', 'name': 'Llama 3.2 11B Vision', 'desc': 'VISION · GRATUITO — leggero e veloce', 'icon': 'fa-gift', 'vision': True},
-        {'id': 'google/gemma-3-27b-it:free', 'name': 'Gemma 3 27B', 'desc': 'VISION · GRATUITO — buona qualità', 'icon': 'fa-gift', 'vision': True},
-        {'id': 'meta-llama/llama-3.3-70b-instruct:free', 'name': 'Llama 3.3 70B', 'desc': 'GRATUITO — solo testo, per la chat', 'icon': 'fa-comments', 'vision': False},
-        {'id': 'deepseek/deepseek-chat:free', 'name': 'DeepSeek Chat', 'desc': 'GRATUITO — solo testo, per la chat', 'icon': 'fa-comments', 'vision': False},
-    ]
+    # NB: la lista viene aggiornata automaticamente dall'API (vedi
+    # fetch_openrouter_free_models); questa è la versione di partenza
+    # (all'avvio, prima del primo aggiornamento).
+    'openrouter': list(_OPENROUTER_CURATED)
 }
 
 def vision_models(provider):
     """Modelli del provider in grado di analizzare le immagini."""
     return [m for m in AI_MODELS.get(provider, []) if m.get('vision')]
+
+
+# Cache dei modelli gratuiti OpenRouter scaricati dall'API (6 ore)
+_OR_MODELS_CACHE = {'ts': 0.0, 'models': None}
+_OR_MODELS_TTL = 60 * 60 * 6
+
+def fetch_openrouter_free_models(force=False):
+    """Scarica l'elenco LIVE dei modelli gratuiti di OpenRouter e aggiorna
+    AI_MODELS['openrouter']. I modelli gratuiti cambiano spesso: aggiornando
+    automaticamente la lista si evitano errori "modello non più disponibile".
+    Se la rete fallisce, resta la lista curata (_OPENROUTER_CURATED)."""
+    import json as _json
+    now = time.time()
+    cached = _OR_MODELS_CACHE
+    if not force and cached['models'] and (now - cached['ts']) < _OR_MODELS_TTL:
+        return cached['models']
+
+    try:
+        r = requests.get("https://openrouter.ai/api/v1/models", timeout=15)
+        data = r.json().get('data', [])
+
+        live_free = {}   # id -> nome leggibile
+        for m in data:
+            mid = m.get('id', '')
+            if ':free' not in mid:
+                continue
+            # Esclude modelli non adatti alle piante (sicurezza contenuti, codice)
+            if any(x in mid for x in ['content-safety', 'code', 'coder']):
+                continue
+            live_free[mid] = m
+
+        def is_vision(mid):
+            arch = (live_free[mid].get('architecture') or {})
+            return 'image' in (arch.get('input_modalities') or [])
+
+        # 1) Prima i modelli curati che sono ANCORA gratuiti (mantengono il nome
+        #    e l'ordine con cui li conosciamo), poi gli altri scoperti live.
+        models = []
+        seen = set()
+        for c in _OPENROUTER_CURATED:
+            if c['id'] in live_free:
+                models.append(dict(c))
+                seen.add(c['id'])
+
+        live_vision = [mid for mid in live_free if mid not in seen and is_vision(mid)]
+        live_text = [mid for mid in live_free if mid not in seen and not is_vision(mid)]
+        for mid in live_vision[:8]:
+            models.append({'id': mid, 'name': live_free[mid].get('name') or mid,
+                           'desc': 'VISION · GRATUITO', 'icon': 'fa-gift', 'vision': True})
+        for mid in live_text[:6]:
+            models.append({'id': mid, 'name': live_free[mid].get('name') or mid,
+                           'desc': 'GRATUITO — solo testo', 'icon': 'fa-comments', 'vision': False})
+
+        if models:
+            AI_MODELS['openrouter'] = models
+            _OR_MODELS_CACHE['ts'] = now
+            _OR_MODELS_CACHE['models'] = models
+            print(f"OpenRouter: aggiornati {len(models)} modelli gratuiti dall'API")
+            return models
+    except Exception as e:
+        print(f"OpenRouter: aggiornamento modelli non riuscito ({e}) — uso la lista curata")
+
+    return _OR_MODELS_CACHE['models'] or list(_OPENROUTER_CURATED)
 
 
 def _needs_model_choice(provider, preferred, error):
@@ -585,6 +657,11 @@ def analyze_plant_image(image_path, plant_name, species_hint="", model_override=
     else:  # openrouter
         api_key = settings.openrouter_api_key or os.environ.get('OPENROUTER_API_KEY')
     
+    # OpenRouter: aggiorna la lista live dei modelli gratuiti (cache 6h) così
+    # le alternative proposte dopo un errore sono modelli realmente disponibili
+    if ai_provider == 'openrouter':
+        fetch_openrouter_free_models()
+
     # Mock data if API key is not present
     if not api_key:
         # Generate rich realistic mockup analysis based on plant_name
@@ -1682,6 +1759,8 @@ def settings():
     
     settings = get_app_settings()
     current_provider = settings.ai_provider or 'openai'
+    # Aggiorna la lista dei modelli gratuiti OpenRouter (cache 6h: di solito è istantaneo)
+    fetch_openrouter_free_models()
     current_model = get_selected_model(settings, current_provider)
     openai_key = settings.openai_api_key or os.environ.get('OPENAI_API_KEY') or ""
     google_key = settings.google_api_key or os.environ.get('GOOGLE_API_KEY') or ""
@@ -1695,6 +1774,18 @@ def settings():
                            openai_key=openai_key, 
                            google_key=google_key,
                            openrouter_key=openrouter_key)
+
+
+@app.route('/settings/openrouter/refresh', methods=['POST'])
+def refresh_openrouter_models():
+    """Forza l'aggiornamento della lista dei modelli gratuiti OpenRouter."""
+    models = fetch_openrouter_free_models(force=True)
+    vision_count = len([m for m in models if m.get('vision')])
+    if models:
+        flash(f"Lista aggiornata: {len(models)} modelli gratuiti disponibili ({vision_count} con VISION).", "success")
+    else:
+        flash("Impossibile aggiornare la lista dei modelli (rete non raggiungibile).", "error")
+    return redirect(url_for('settings'))
 
 
 # --- CHAT COL BOTANICO IA ---
