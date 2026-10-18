@@ -14,7 +14,7 @@ import google.generativeai as genai
 import io
 from PIL import Image
 
-__version__ = "1.8.1"  # Fonte unica della versione (vedi CHANGELOG.md)
+__version__ = "1.8.2"  # Fonte unica della versione (vedi CHANGELOG.md)
 
 app = Flask(__name__)
 app.secret_key = "plant_tracker_super_secret_key"
@@ -74,8 +74,8 @@ class Task(db.Model):
 # caricamento live dall'API non è disponibile. La disponibilità dei modelli
 # gratuiti cambia spesso, per questo l'app prova ad aggiornare la lista da sola.
 _OPENROUTER_CURATED = [
-    {'id': 'google/gemma-4-31b-it:free', 'name': 'Gemma 4 31B', 'desc': 'VISION · GRATUITO — qualità elevata (consigliato)', 'icon': 'fa-gift', 'vision': True},
-    {'id': 'nvidia/nemotron-3.5-super-vl:free', 'name': 'Nemotron 3.5 Super VL', 'desc': 'VISION · GRATUITO — specializzato nelle immagini', 'icon': 'fa-gift', 'vision': True},
+    {'id': 'nvidia/nemotron-3.5-super-vl:free', 'name': 'Nemotron 3.5 Super VL', 'desc': 'VISION · GRATUITO — affidabile e specializzato nelle immagini (consigliato)', 'icon': 'fa-gift', 'vision': True},
+    {'id': 'google/gemma-4-31b-it:free', 'name': 'Gemma 4 31B', 'desc': 'VISION · GRATUITO — qualità elevata', 'icon': 'fa-gift', 'vision': True},
     {'id': 'google/gemma-4-26b-a4b-it:free', 'name': 'Gemma 4 26B', 'desc': 'VISION · GRATUITO — leggero e veloce', 'icon': 'fa-gift', 'vision': True},
     {'id': 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free', 'name': 'Nemotron 3 Nano Omni', 'desc': 'VISION · GRATUITO — con ragionamento', 'icon': 'fa-gift', 'vision': True},
     {'id': 'nvidia/nemotron-3-super-120b-a12b:free', 'name': 'Nemotron 3 Super 120B', 'desc': 'GRATUITO — solo testo, per la chat', 'icon': 'fa-comments', 'vision': False},
@@ -184,11 +184,21 @@ def _needs_model_choice(provider, preferred, error):
         for m in vision_models(provider)
         if m['id'] != preferred
     ]
+    # Suggerimento utile quando l'errore è un limite di utilizzo (tipico dei
+    # modelli gratuiti su OpenRouter) oppure un modello non più disponibile
+    low = (error or '').lower()
+    if '429' in low or 'rate limit' in low or 'quota' in low:
+        hint = ("Il modello gratuito ha raggiunto il limite di utilizzo. "
+                "Aspetta qualche minuto oppure scegli un altro modello qui sotto.")
+    elif '404' in low or 'unavailable' in low or 'not found' in low:
+        hint = ("Questo modello non è più disponibile su OpenRouter. "
+                "Scegline un altro qui sotto (o aggiorna la lista nelle Impostazioni).")
+    else:
+        hint = "Scegli un altro modello qui sotto per riprovare."
     return {
         "status": "needs_model_choice",
         "is_mock": False,
-        "message": (f"Il modello selezionato ({_get_model_display_name(preferred)}) "
-                    f"non ha risposto: {error}"),
+        "message": hint,
         "preferred_model_id": preferred,
         "preferred_model_name": _get_model_display_name(preferred),
         "failed_error": error,
@@ -239,6 +249,21 @@ def get_openai_compatible_client(provider, api_key):
         return get_openrouter_client(api_key)
     import openai
     return openai.OpenAI(api_key=api_key)
+
+
+def ai_json_completion(client, model, messages, max_tokens=1000):
+    """Chiamata chat che deve restituire JSON.
+    Prova prima a forzare il formato JSON (response_format), ma se il modello
+    non lo supporta (molti modelli gratuiti, es. certi Nemotron) riprova senza:
+    in quel caso ci affidiamo a clean_ai_json per estrarre il JSON dal testo."""
+    base_kwargs = dict(model=model, messages=messages, max_tokens=max_tokens)
+    try:
+        resp = client.chat.completions.create(
+            response_format={"type": "json_object"}, **base_kwargs)
+    except Exception as e:
+        print(f"response_format non supportato da {model} ({str(e)[:120]}) — riprovo senza")
+        resp = client.chat.completions.create(**base_kwargs)
+    return json.loads(clean_ai_json(resp.choices[0].message.content))
 
 
 def provider_api_key(settings):
@@ -744,9 +769,10 @@ def analyze_plant_image(image_path, plant_name, species_hint="", model_override=
                 client = openai.OpenAI(api_key=api_key)
 
             try:
-                response = client.chat.completions.create(
-                    model=selected_model,
-                    messages=[
+                result = ai_json_completion(
+                    client,
+                    selected_model,
+                    [
                         {
                             "role": "user",
                             "content": [
@@ -760,10 +786,8 @@ def analyze_plant_image(image_path, plant_name, species_hint="", model_override=
                             ]
                         }
                     ],
-                    response_format={"type": "json_object"},
-                    max_tokens=1000
+                    max_tokens=1000,
                 )
-                result = json.loads(clean_ai_json(response.choices[0].message.content))
             except Exception as e:
                 # Nessun cambio automatico di modello: se l'utente ha già
                 # confermato un modello, l'errore è definitivo.
@@ -940,12 +964,11 @@ def get_seasonal_suggestions():
         
         if ai_provider in ('openai', 'openrouter'):
             client = get_openai_compatible_client(ai_provider, api_key)
-            response = client.chat.completions.create(
-                model=get_selected_model(settings, ai_provider),
-                messages=[{"role": "user", "content": prompt}],
-                response_format={"type": "json_object"}
+            data = ai_json_completion(
+                client,
+                get_selected_model(settings, ai_provider),
+                [{"role": "user", "content": prompt}],
             )
-            data = json.loads(clean_ai_json(response.choices[0].message.content))
         else: # Google Gemini / Gemma
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel(get_selected_model(settings, 'google'))
@@ -1575,6 +1598,7 @@ def diagnose_choice(job_id):
                            plant_name=job['plant_name'],
                            preferred_model_name=result.get('preferred_model_name', 'Modello selezionato'),
                            error_message=result.get('failed_error') or result.get('message', ''),
+                           hint=result.get('message', ''),
                            alternatives=result.get('alternatives', []))
 
 

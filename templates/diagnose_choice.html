@@ -27,8 +27,11 @@
             <p class="text-sm text-rose-900">
                 <strong>{{ preferred_model_name }}</strong> non ha risposto.
             </p>
+            {% if hint %}
+            <p class="text-sm text-stone-800 font-medium">{{ hint }}</p>
+            {% endif %}
             {% if error_message %}
-            <p class="text-xs text-rose-700 mt-1 break-words">{{ error_message }}</p>
+            <p class="text-xs text-stone-500 mt-1 break-words">Dettaglio tecnico: {{ error_message }}</p>
             {% endif %}
             <p class="text-xs text-stone-600 mt-2">Florae <strong>non cambia modello da sola</strong>: scegli tu se riprovare con un altro.</p>
         </div>

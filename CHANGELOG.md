@@ -1,5 +1,19 @@
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.8.2] – 2025-08-29
+
+### Corretto
+- **Molti modelli gratuiti fallivano per il formato JSON forzato**: l'app richiedeva `response_format: json_object` a ogni chiamata, ma diversi modelli gratuiti (es. Nemotron 3.5 Lightning, Nemotron 3 Nano Omni) **non supportano il formato strutturato** e restituivano errore
+  - Ora, se la richiesta con formato JSON fallisce, l'app **riprova automaticamente senza** forzare il formato e ricava il JSON dal testo (`clean_ai_json`)
+  - Vale per diagnosi foto e suggerimenti stagionali
+
+### Migliorato
+- **Messaggi di errore più chiari** nella schermata di scelta del modello:
+  - limite di utilizzo raggiunto (429/quota) → invito ad attendere o cambiare modello
+  - modello non più disponibile (404) → invito a sceglierne un altro o aggiornare la lista
+  - il dettaglio tecnico dell'errore resta visibile ma in secondo piano
+- **Ordine dei modelli OpenRouter rivisto**: primo modello consigliato ora è **Nemotron 3.5 Super VL** (VISION, supporta sia JSON strutturato sia immagini), seguito da Gemma 4 31B, Gemma 4 26B e Nemotron 3 Nano Omni
+
 ## [1.8.1] – 2025-08-29
 
 ### Corretto
