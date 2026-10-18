@@ -14,7 +14,7 @@ import google.generativeai as genai
 import io
 from PIL import Image
 
-__version__ = "1.7.5"  # Fonte unica della versione (vedi CHANGELOG.md)
+__version__ = "1.7.7"  # Fonte unica della versione (vedi CHANGELOG.md)
 
 app = Flask(__name__)
 app.secret_key = "plant_tracker_super_secret_key"
@@ -181,29 +181,32 @@ def _run_diagnosis_job(job_id, image_path, plant_name, species):
     """Esegue l'analisi IA in background e aggiorna lo stato del job.
     Se il thread muore per un'eccezione inattesa, il job finisce in errore
     (il frontend mostra il messaggio invece di restare in attesa eterna)."""
-    try:
-        result = analyze_plant_image(image_path, plant_name, species)
-        _set_job(job_id, result=result,
-                 status='complete' if result.get('status') != 'error' else 'error',
-                 finished_at=time.time())
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        _set_job(job_id,
-                 result={
-                     "status": "error",
-                     "message": f"Errore inatteso durante l'analisi: {str(e)}",
-                     "is_mock": False,
-                     "plant_name": plant_name or "Pianta generica",
-                     "problem": "Diagnosi non disponibile",
-                     "details": "",
-                     "solution": "",
-                     "urgency": "Media",
-                     "exposure_rules": "",
-                     "watering_rules": "",
-                 },
-                 status='error',
-                 finished_at=time.time())
+    # Il thread non eredita il contesto applicazione di Flask:
+    # senza app_context() l'accesso al database (get_app_settings) fallirebbe.
+    with app.app_context():
+        try:
+            result = analyze_plant_image(image_path, plant_name, species)
+            _set_job(job_id, result=result,
+                     status='complete' if result.get('status') != 'error' else 'error',
+                     finished_at=time.time())
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            _set_job(job_id,
+                     result={
+                         "status": "error",
+                         "message": f"Errore inatteso durante l'analisi: {str(e)}",
+                         "is_mock": False,
+                         "plant_name": plant_name or "Pianta generica",
+                         "problem": "Diagnosi non disponibile",
+                         "details": "",
+                         "solution": "",
+                         "urgency": "Media",
+                         "exposure_rules": "",
+                         "watering_rules": "",
+                     },
+                     status='error',
+                     finished_at=time.time())
 
 def run_with_timeout(func, timeout_seconds=AI_CALL_TIMEOUT_SECONDS, raise_on_error=False):
     """Esegue func() in un thread separato.
@@ -212,12 +215,15 @@ def run_with_timeout(func, timeout_seconds=AI_CALL_TIMEOUT_SECONDS, raise_on_err
     """
     result = {}
     def _target():
-        try:
-            result['value'] = func()
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            result['error'] = e
+        # Il thread non eredita il contesto Flask: lo riapriamo qui
+        # così func() può usare database e configurazione in sicurezza.
+        with app.app_context():
+            try:
+                result['value'] = func()
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                result['error'] = e
     t = threading.Thread(target=_target, daemon=True)
     t.start()
     t.join(timeout_seconds)

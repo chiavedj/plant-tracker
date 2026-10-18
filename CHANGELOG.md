@@ -1,5 +1,12 @@
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.7.7] – 2025-08-29
+
+### Corretto
+- **Diagnosi falliva con "Errore inatteso durante l'analisi: Working outside of application context"** — l'analisi IA gira in un thread in background che non eredita il contesto applicazione di Flask, quindi l'accesso al database delle impostazioni (`get_app_settings`) falliva sempre
+  - `_run_diagnosis_job` ora apre esplicitamente `app.app_context()` prima dell'analisi
+  - `run_with_timeout` (usato da chat IA, suggerimenti stagionali e wishlist) apre a sua volta `app.app_context()` nel thread: tutte le chiamate IA in background sono ora protette allo stesso modo
+
 ## [1.7.5] – 2025-08-29
 
 ### Migliorato
