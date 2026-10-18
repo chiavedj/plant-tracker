@@ -1,5 +1,15 @@
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.8.3] – 2025-08-29
+
+### Corretto
+- **Su mobile la voce "Bacheca" del menu non era più raggiungibile**: il menu laterale era posizionato a `top-0` con `z-index` inferiore a quello dell'header, che quindi **copriva la prima voce** del menu (proprio "Bacheca"). Ora il menu inizia sotto l'header e tutte le voci sono cliccabili
+
+### Aggiunto
+- **Barra di navigazione fissa in basso su mobile**: Bacheca, Piante, Analisi, Botanico e Impostazioni sono sempre visibili e a un tocco di distanza, senza dover aprire il menu
+  - Evidenzia la sezione attiva
+  - Il contenuto delle pagine ha spazio in fondo per non finire dietro la barra
+
 ## [1.8.2] – 2025-08-29
 
 ### Corretto

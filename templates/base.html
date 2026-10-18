@@ -41,7 +41,7 @@
     <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-10 hidden md:hidden transition-opacity duration-300 opacity-0"></div>
 
     <!-- Sidebar / Sidebar Navigation -->
-    <aside id="sidebar" class="fixed md:sticky top-0 hidden md:flex flex-col w-64 bg-emerald-950 text-stone-100 h-screen p-6 shadow-xl z-20 transition-all duration-300 -translate-x-full md:translate-x-0 flex-shrink-0">
+    <aside id="sidebar" class="fixed md:sticky top-0 hidden md:flex flex-col w-64 bg-emerald-950 text-stone-100 h-screen p-6 pt-20 pb-24 md:pt-6 md:pb-6 shadow-xl z-20 transition-all duration-300 -translate-x-full md:translate-x-0 flex-shrink-0 overflow-y-auto">
         <div class="hidden md:flex items-center space-x-3 mb-8 px-2">
             <div class="bg-emerald-800 p-2 rounded-xl text-emerald-300">
                 <i class="fa-solid fa-leaf text-2xl"></i>
@@ -102,7 +102,7 @@
     </aside>
 
     <!-- Main Content Area -->
-    <main class="flex-grow flex flex-col min-w-0">
+    <main class="flex-grow flex flex-col min-w-0 pb-20 md:pb-0">
         <!-- Messages/Alerts Container -->
         <div class="px-6 pt-6 max-w-7xl w-full mx-auto">
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -149,6 +149,32 @@
             </div>
         </footer>
     </main>
+
+    <!-- Mobile Bottom Navigation: sempre visibile, così la Bacheca è sempre raggiungibile -->
+    <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-stone-200 shadow-lg z-40">
+        <div class="grid grid-cols-5">
+            <a href="/" class="flex flex-col items-center justify-center py-2.5 text-[10px] font-semibold transition-colors {% if request.path == '/' %} text-emerald-700 {% else %} text-stone-500 {% endif %}">
+                <i class="fa-solid fa-grip text-lg mb-0.5"></i>
+                <span>Bacheca</span>
+            </a>
+            <a href="/plants" class="flex flex-col items-center justify-center py-2.5 text-[10px] font-semibold transition-colors {% if request.path.startswith('/plants') or request.path.startswith('/plant/') %} text-emerald-700 {% else %} text-stone-500 {% endif %}">
+                <i class="fa-solid fa-seedling text-lg mb-0.5"></i>
+                <span>Piante</span>
+            </a>
+            <a href="/diagnose" class="flex flex-col items-center justify-center py-2.5 text-[10px] font-semibold transition-colors {% if request.path.startswith('/diagnose') %} text-emerald-700 {% else %} text-stone-500 {% endif %}">
+                <i class="fa-solid fa-wand-magic-sparkles text-lg mb-0.5"></i>
+                <span>Analisi</span>
+            </a>
+            <a href="/chatbot" class="flex flex-col items-center justify-center py-2.5 text-[10px] font-semibold transition-colors {% if request.path == '/chatbot' %} text-emerald-700 {% else %} text-stone-500 {% endif %}">
+                <i class="fa-solid fa-comments text-lg mb-0.5"></i>
+                <span>Botanico</span>
+            </a>
+            <a href="/settings" class="flex flex-col items-center justify-center py-2.5 text-[10px] font-semibold transition-colors {% if request.path == '/settings' %} text-emerald-700 {% else %} text-stone-500 {% endif %}">
+                <i class="fa-solid fa-sliders text-lg mb-0.5"></i>
+                <span>Impostazioni</span>
+            </a>
+        </div>
+    </nav>
 
     <!-- Mobile Nav Javascript -->
     <script>

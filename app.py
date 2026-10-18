@@ -14,7 +14,7 @@ import google.generativeai as genai
 import io
 from PIL import Image
 
-__version__ = "1.8.2"  # Fonte unica della versione (vedi CHANGELOG.md)
+__version__ = "1.8.3"  # Fonte unica della versione (vedi CHANGELOG.md)
 
 app = Flask(__name__)
 app.secret_key = "plant_tracker_super_secret_key"
