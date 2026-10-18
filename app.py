@@ -10,8 +10,10 @@ import threading
 import time
 import requests
 import google.generativeai as genai
+import io
+from PIL import Image
 
-__version__ = "1.7.4"  # Fonte unica della versione (vedi CHANGELOG.md)
+__version__ = "1.7.5"  # Fonte unica della versione (vedi CHANGELOG.md)
 
 app = Flask(__name__)
 app.secret_key = "plant_tracker_super_secret_key"
@@ -399,6 +401,32 @@ def utility_processor():
     )
 
 # Helper for AI Analysis
+def optimize_image_for_ai(image_path):
+    """Ridimensiona e comprime l'immagine per l'invio alle API di analisi.
+    Le foto moderne sono spesso 10-20MB: riducendole a max 1024px si
+    velocizza enormemente l'invio e l'elaborazione lato AI."""
+    try:
+        img = Image.open(image_path)
+        # Gestisce formati HEIC/PNG con trasparenza convertendo in RGB su sfondo bianco
+        if img.mode in ("RGBA", "P", "LA"):
+            background = Image.new("RGB", img.size, (255, 255, 255))
+            background.paste(img, mask=img.convert("RGBA").split()[3])
+            img = background
+        elif img.mode != "RGB":
+            img = img.convert("RGB")
+
+        max_dimension = 1024
+        if img.width > max_dimension or img.height > max_dimension:
+            img.thumbnail((max_dimension, max_dimension), Image.Resampling.LANCZOS)
+
+        buffer = io.BytesIO()
+        img.save(buffer, format="JPEG", quality=85, optimize=True)
+        return buffer.getvalue()
+    except Exception as e:
+        print(f"Errore ottimizzazione immagine: {str(e)} — uso il file originale")
+        with open(image_path, "rb") as f:
+            return f.read()
+
 def analyze_plant_image(image_path, plant_name, species_hint=""):
     settings = get_app_settings()
     ai_provider = settings.ai_provider or 'openai'
@@ -475,8 +503,9 @@ def analyze_plant_image(image_path, plant_name, species_hint=""):
 
         if ai_provider == 'openai':
             import openai
-            with open(image_path, "rb") as image_file:
-                base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+            # Ottimizza l'immagine (ridimensionamento a 1024px) prima di inviarla
+            optimized_image_bytes = optimize_image_for_ai(image_path)
+            base64_image = base64.b64encode(optimized_image_bytes).decode('utf-8')
 
             selected_model = get_selected_model(settings, 'openai')
             client = openai.OpenAI(api_key=api_key)
@@ -529,8 +558,8 @@ def analyze_plant_image(image_path, plant_name, species_hint=""):
                 try:
                     print(f"Trying model: {model_name}...")
                     model = genai.GenerativeModel(model_name)
-                    with open(image_path, "rb") as image_file:
-                        image_data = image_file.read()
+                    # Ottimizza l'immagine (ridimensionamento a 1024px) prima di inviarla
+                    image_data = optimize_image_for_ai(image_path)
                     
                     contents = [
                         prompt,

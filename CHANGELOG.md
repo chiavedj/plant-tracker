@@ -1,5 +1,17 @@
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.7.5] – 2025-08-29
+
+### Migliorato
+- **Diagnosi foto molto più veloce**: le immagini vengono ottimizzate prima dell'invio alle API di analisi
+  - Ridimensionamento automatico a massimo 1024px (le foto dei telefoni moderni arrivano a 10-20MB)
+  - Compressione JPEG qualità 85% con Pillow
+  - Gestione trasparenze (PNG/HEIC) convertendo su sfondo bianco
+  - Riduzione drastica dei tempi di invio e dell'upload verso OpenAI e Google
+
+### Aggiunto
+- Dipendenza **Pillow** per l'elaborazione delle immagini
+
 ## [1.7.4] – 2025-08-29
 
 ### Corretto
