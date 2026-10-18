@@ -1,5 +1,12 @@
 e il versioning segue [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.8.4] – 2025-08-29
+
+### Modificato
+- **Rimosso il menu laterale a scomparsa su mobile**: la navigazione su telefono avviene ora esclusivamente tramite la **barra fissa in basso**, più immediata. L'hamburger e l'overlay sono stati eliminati; il menu laterale resta solo su desktop
+  - Aggiunta **Wishlist** alla barra in basso (prima era raggiungibile solo dal menu), che ora ha 6 voci: Bacheca, Piante, Wishlist, Analisi, Botanico, Impostazioni
+  - L'header mobile mostra solo il logo, centrato
+
 ## [1.8.3] – 2025-08-29
 
 ### Corretto

@@ -27,18 +27,14 @@
 <body class="bg-stone-50 text-stone-800 min-h-screen flex flex-col md:flex-row">
 
     <!-- Mobile Nav Header -->
-    <header class="md:hidden bg-emerald-900 text-white p-4 flex justify-between items-center shadow-md sticky top-0 z-30">
+    <header class="md:hidden bg-emerald-900 text-white p-4 flex justify-center items-center shadow-md sticky top-0 z-30">
         <div class="flex items-center space-x-2">
             <i class="fa-solid fa-leaf text-emerald-400 text-2xl"></i>
             <span class="font-serif text-2xl font-bold tracking-wide">Florae</span>
         </div>
-        <button id="mobile-menu-btn" class="text-white hover:text-emerald-300 focus:outline-none p-2 rounded-lg bg-emerald-800/50">
-            <i class="fa-solid fa-bars text-2xl"></i>
-        </button>
     </header>
 
-    <!-- Mobile Overlay -->
-    <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-10 hidden md:hidden transition-opacity duration-300 opacity-0"></div>
+    <!-- Mobile Overlay (non più necessario: la navigazione mobile è la barra in basso) -->
 
     <!-- Sidebar / Sidebar Navigation -->
     <aside id="sidebar" class="fixed md:sticky top-0 hidden md:flex flex-col w-64 bg-emerald-950 text-stone-100 h-screen p-6 pt-20 pb-24 md:pt-6 md:pb-6 shadow-xl z-20 transition-all duration-300 -translate-x-full md:translate-x-0 flex-shrink-0 overflow-y-auto">
@@ -152,57 +148,33 @@
 
     <!-- Mobile Bottom Navigation: sempre visibile, così la Bacheca è sempre raggiungibile -->
     <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-stone-200 shadow-lg z-40">
-        <div class="grid grid-cols-5">
-            <a href="/" class="flex flex-col items-center justify-center py-2.5 text-[10px] font-semibold transition-colors {% if request.path == '/' %} text-emerald-700 {% else %} text-stone-500 {% endif %}">
+        <div class="grid grid-cols-6">
+            <a href="/" class="flex flex-col items-center justify-center py-2.5 text-[9px] font-semibold transition-colors {% if request.path == '/' %} text-emerald-700 {% else %} text-stone-500 {% endif %}">
                 <i class="fa-solid fa-grip text-lg mb-0.5"></i>
                 <span>Bacheca</span>
             </a>
-            <a href="/plants" class="flex flex-col items-center justify-center py-2.5 text-[10px] font-semibold transition-colors {% if request.path.startswith('/plants') or request.path.startswith('/plant/') %} text-emerald-700 {% else %} text-stone-500 {% endif %}">
+            <a href="/plants" class="flex flex-col items-center justify-center py-2.5 text-[9px] font-semibold transition-colors {% if request.path.startswith('/plants') or request.path.startswith('/plant/') %} text-emerald-700 {% else %} text-stone-500 {% endif %}">
                 <i class="fa-solid fa-seedling text-lg mb-0.5"></i>
                 <span>Piante</span>
             </a>
-            <a href="/diagnose" class="flex flex-col items-center justify-center py-2.5 text-[10px] font-semibold transition-colors {% if request.path.startswith('/diagnose') %} text-emerald-700 {% else %} text-stone-500 {% endif %}">
+            <a href="/wishlist" class="flex flex-col items-center justify-center py-2.5 text-[9px] font-semibold transition-colors {% if request.path == '/wishlist' %} text-emerald-700 {% else %} text-stone-500 {% endif %}">
+                <i class="fa-solid fa-heart text-lg mb-0.5"></i>
+                <span>Wishlist</span>
+            </a>
+            <a href="/diagnose" class="flex flex-col items-center justify-center py-2.5 text-[9px] font-semibold transition-colors {% if request.path.startswith('/diagnose') %} text-emerald-700 {% else %} text-stone-500 {% endif %}">
                 <i class="fa-solid fa-wand-magic-sparkles text-lg mb-0.5"></i>
                 <span>Analisi</span>
             </a>
-            <a href="/chatbot" class="flex flex-col items-center justify-center py-2.5 text-[10px] font-semibold transition-colors {% if request.path == '/chatbot' %} text-emerald-700 {% else %} text-stone-500 {% endif %}">
+            <a href="/chatbot" class="flex flex-col items-center justify-center py-2.5 text-[9px] font-semibold transition-colors {% if request.path == '/chatbot' %} text-emerald-700 {% else %} text-stone-500 {% endif %}">
                 <i class="fa-solid fa-comments text-lg mb-0.5"></i>
                 <span>Botanico</span>
             </a>
-            <a href="/settings" class="flex flex-col items-center justify-center py-2.5 text-[10px] font-semibold transition-colors {% if request.path == '/settings' %} text-emerald-700 {% else %} text-stone-500 {% endif %}">
+            <a href="/settings" class="flex flex-col items-center justify-center py-2.5 text-[9px] font-semibold transition-colors {% if request.path == '/settings' %} text-emerald-700 {% else %} text-stone-500 {% endif %}">
                 <i class="fa-solid fa-sliders text-lg mb-0.5"></i>
-                <span>Impostazioni</span>
+                <span>Impostaz.</span>
             </a>
         </div>
     </nav>
 
-    <!-- Mobile Nav Javascript -->
-    <script>
-        const mobileBtn = document.getElementById('mobile-menu-btn');
-        const sidebar = document.getElementById('sidebar');
-        const overlay = document.getElementById('sidebar-overlay');
-
-        function toggleMenu() {
-            const isOpen = !sidebar.classList.contains('-translate-x-full');
-            
-            if (isOpen) {
-                // Close
-                sidebar.classList.add('-translate-x-full');
-                sidebar.classList.add('hidden');
-                overlay.classList.add('hidden');
-                overlay.classList.remove('opacity-100');
-            } else {
-                // Open
-                sidebar.classList.remove('hidden');
-                sidebar.classList.remove('-translate-x-full');
-                sidebar.classList.add('flex');
-                overlay.classList.remove('hidden');
-                setTimeout(() => overlay.classList.add('opacity-100'), 10);
-            }
-        }
-
-        mobileBtn.addEventListener('click', toggleMenu);
-        overlay.addEventListener('click', toggleMenu);
-    </script>
 </body>
 </html>
